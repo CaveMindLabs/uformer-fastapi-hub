@@ -1,0 +1,164 @@
+<!-- noctura-uformer/backend/wstest_uformer.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>NocturaVision - Uformer Real-time Test</title>
+    <style>
+        html, body { height: 100vh; margin: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #282c34; color: white; display: flex; flex-direction: column; }
+        header { background-color: #20232a; padding: 20px; text-align: center; flex-shrink: 0; }
+        header h1 { margin: 0 0 10px 0; font-size: 2.5rem; display: flex; align-items: center; justify-content: center; gap: 15px; }
+        header p { margin: 0; font-size: 1.1rem; color: #ccc; }
+        .page-content { display: flex; flex-direction: row; flex-grow: 1; padding: 20px; gap: 20px; box-sizing: border-box; min-height: 0; }
+        .sidebar { flex: 0 0 350px; background-color: #3c4049; padding: 20px; border-radius: 8px; display: flex; flex-direction: column; gap: 25px; overflow-y: auto; }
+        .sidebar h2 { margin-top: 0; border-bottom: 1px solid #61dafb; padding-bottom: 10px; color: #61dafb; }
+        .control-group { display: flex; flex-direction: column; gap: 10px; }
+        .control-group label { font-weight: bold; font-size: 0.9rem; }
+        .checkbox-group label { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+        .main-content { flex-grow: 1; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+        .actions-bar { display: flex; align-items: center; gap: 20px; background-color: #4a4f5a; padding: 15px; border-radius: 8px; flex-shrink: 0; }
+        #startButton, #stopButton { font-size: 1.1rem; padding: 10px 20px; cursor: pointer; border: none; border-radius: 5px; background-color: #61dafb; color: #20232a; font-weight: bold; transition: background-color 0.2s; }
+        #startButton:hover:not(:disabled), #stopButton:hover:not(:disabled) { background-color: #52b8d8; }
+        #startButton:disabled, #stopButton:disabled { background-color: #555; color: #888; cursor: not-allowed; }
+        #status { font-style: italic; color: #ccc; }
+        #status.error { color: #ff6b6b; font-weight: bold; }
+        .video-feeds-container { display: flex; gap: 20px; flex-grow: 1; min-height: 0; }
+        .video-box { flex: 1; background-color: #4a4f5a; border-radius: 8px; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; }
+        .video-box h3 { margin: 0; color: #61dafb; flex-shrink: 0; }
+        .video-box video, .video-box img { width: 100%; height: 100%; max-height: 100%; border-radius: 5px; border: 2px solid #ccc; background-color: #20232a; aspect-ratio: 4 / 3; object-fit: contain; box-sizing: border-box; }
+        #webcam { transform: scaleX(-1); }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🦉 NocturaVision <span style="font-weight: 300; color: #ccc;">| Uformer</span></h1>
+        <p>Real-time Low-Light Enhancement</p>
+    </header>
+    <div class="page-content">
+        <div class="sidebar">
+            <h2>Video Controls</h2>
+            <div class="control-group">
+                <label>Enhancement Model</label>
+                <p style="padding: 8px; background-color: #4a4f5a; border-radius: 4px; margin: 0;">Uformer (SIDD Pre-trained)</p>
+            </div>
+            <div class="control-group checkbox-group">
+                <label><input type="checkbox" id="fpsCheckbox" checked> Show FPS Counter</label>
+            </div>
+        </div>
+        <div class="main-content">
+            <div class="actions-bar">
+                <button id="startButton">Start Webcam</button>
+                <button id="stopButton" disabled>Stop Webcam</button>
+                <p id="status">Idle. Press Start to begin.</p>
+            </div>
+            <div class="video-feeds-container">
+                <div class="video-box">
+                    <h3>Original Webcam</h3>
+                    <video id="webcam" autoplay playsinline muted></video>
+                </div>
+                <div class="video-box">
+                    <h3>Enhanced Stream</h3>
+                    <img id="processedImage" alt="Processed stream from backend" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const webcamVideo = document.getElementById('webcam');
+        const processedImage = document.getElementById('processedImage');
+        const statusSpan = document.getElementById('status');
+        const fpsCheckbox = document.getElementById('fpsCheckbox');
+
+        let websocket;
+        let stream;
+        let isStreaming = false;
+        const WS_URL = "ws://127.0.0.1:8000/ws/process_video";
+
+        startButton.onclick = async () => {
+            try {
+                statusSpan.classList.remove('error');
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                webcamVideo.srcObject = stream;
+                statusSpan.textContent = 'Webcam started.';
+                
+                websocket = new WebSocket(WS_URL);
+
+                websocket.onopen = () => {
+                    statusSpan.textContent = 'WebSocket Connected. Processing...';
+                    startButton.disabled = true;
+                    stopButton.disabled = false;
+                    isStreaming = true;
+                    requestAnimationFrame(processAndSendFrame); 
+                };
+
+                websocket.onmessage = (event) => {
+                    processedImage.src = event.data;
+                    if (isStreaming) {
+                        requestAnimationFrame(processAndSendFrame);
+                    }
+                };
+
+                websocket.onclose = () => {
+                    if (isStreaming) { statusSpan.textContent = 'WebSocket Disconnected.'; }
+                    stopStreaming();
+                };
+
+                websocket.onerror = (error) => {
+                    statusSpan.classList.add('error');
+                    statusSpan.textContent = !isStreaming ? 'Connection Failed. Is the backend running?' : 'WebSocket Error during stream.';
+                    console.error("WebSocket Error:", error);
+                    stopStreaming();
+                };
+            } catch (err) {
+                console.error("Error starting webcam:", err);
+                statusSpan.textContent = 'Error starting webcam!';
+            }
+        };
+
+        stopButton.onclick = () => {
+            statusSpan.classList.remove('error');
+            statusSpan.textContent = 'Idle. Press Start to begin.';
+            stopStreaming();
+        };
+
+        function processAndSendFrame() {
+            if (!isStreaming || !websocket || websocket.readyState !== WebSocket.OPEN || !webcamVideo.videoWidth) {
+                return;
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = webcamVideo.videoWidth;
+            canvas.height = webcamVideo.videoHeight;
+            const context = canvas.getContext('2d');
+            
+            context.translate(canvas.width, 0);
+            context.scale(-1, 1);
+            context.drawImage(webcamVideo, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/jpeg');
+
+            const payload = {
+                image_b64: dataUrl,
+                show_fps: fpsCheckbox.checked
+            };
+            websocket.send(JSON.stringify(payload));
+        }
+
+        function stopStreaming() {
+            isStreaming = false;
+            if (websocket) {
+                websocket.onclose = null; 
+                websocket.close();
+            }
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                webcamVideo.srcObject = null;
+            }
+            startButton.disabled = false;
+            stopButton.disabled = true;
+            processedImage.src = "";
+        }
+    </script>
+</body>
+</html>

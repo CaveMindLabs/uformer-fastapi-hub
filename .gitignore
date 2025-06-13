@@ -1,0 +1,45 @@
+# --- Python ---
+# Virtual environment folders
+.venv/
+venv/
+ENV/
+env/
+# Pipenv
+Pipfile.lock
+
+# Byte-compiled / optimized / C extensions
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# --- Generated & Temporary Files ---
+# Debugging outputs
+debug_keys.txt
+# Build artifacts
+/build/
+/dist/
+*.egg-info/
+
+# --- OS-generated files ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# --- Large Files & Datasets ---
+# Exclude all model weights. Use Git LFS for this if you MUST track them.
+*.pth
+*.pt
+*.onnx
+*.pb
+# Exclude all dataset directories
+datasets/
+Uformer/
+
+
+# Others
+_code_state.md

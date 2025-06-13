@@ -1,0 +1,32 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[[source]]
+url = "https://download.pytorch.org/whl/cu128"
+verify_ssl = true
+name = "pytorch"
+
+[packages]
+fastapi = "*"
+uvicorn = {extras = ["standard"], version = "*"}
+torch = {version = "*", index = "pytorch"}
+torchvision = {version = "*", index = "pytorch"}
+opencv-python = "*"
+scikit-image = "*"
+matplotlib = "*"
+tqdm = "*"
+einops = "*"
+timm = "*"
+yacs = "*"
+ptflops = "*"
+h5py = "*"
+joblib = "*"
+natsort = "*"
+Pillow = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.12"
