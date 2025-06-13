@@ -18,6 +18,9 @@ FILES_TO_EXTRACT = [
     "backend/app/main.py",
     "backend/app/api/dependencies.py",
     "backend/app/api/endpoints/video_processing.py",
+    "backend/app/api/endpoints/file_processing.py",
+    "backend/app/api/endpoints/image_processing.py",
+
 
     # --- Core Uformer Model Code (for inference) ---
     "backend/uformer_model/model.py",
@@ -27,7 +30,7 @@ FILES_TO_EXTRACT = [
     # --- HTML User Interfaces ---
     "backend/wstest_uformer.html",
     "backend/video_processor.html",
-    # "backend/image_processor.html", # To be added once created
+    "backend/image_processor.html",
 
     # --- Script for generating this state file ---
     "_code_state.py",

@@ -6,6 +6,8 @@ noctura-uformer/
 │   ├── app/
 │   │   ├── api/
 │   │   │   ├── endpoints/
+│   │   │   │   ├── file_processing.py
+│   │   │   │   ├── image_processing.py
 │   │   │   │   └── video_processing.py
 │   │   │   └── dependencies.py
 │   │   └── main.py
@@ -13,6 +15,17 @@ noctura-uformer/
 │   │   ├── custom_trained/ (empty)
 │   │   └── official_pretrained/
 │   │       └── Uformer_B_SIDD.pth
+│   ├── temp/
+│   │   ├── images/
+│   │   │   ├── processed/ (elements ignored)
+│   │   │   └── uploads/ (elements ignored)
+│   │   └── videos/
+│   │       ├── processed/
+│   │       │   ├── enhanced_2d12bb46-f981-4a9b-939f-dc0bbafe2f62_Marvel Studios’ Moon Knight  Official Trailer  Disney plus.mp4
+│   │       │   └── enhanced_986e9eb9-2cab-4e2e-8c12-c08132369566_What's that in the sky - A group of moving lights flying across the sky in the Triad.mp4
+│   │       └── uploads/
+│   │           ├── 2d12bb46-f981-4a9b-939f-dc0bbafe2f62_Marvel Studios’ Moon Knight  Official Trailer  Disney plus.mp4
+│   │           └── 986e9eb9-2cab-4e2e-8c12-c08132369566_What's that in the sky - A group of moving lights flying across the sky in the Triad.mp4
 │   ├── uformer_model/
 │   │   ├── utils/
 │   │   │   ├── __init__.py
