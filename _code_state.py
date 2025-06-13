@@ -24,8 +24,10 @@ FILES_TO_EXTRACT = [
     "backend/uformer_model/utils/image_utils.py",
     "backend/uformer_model/utils/__init__.py",
 
-    # --- HTML Test Client ---
+    # --- HTML User Interfaces ---
     "backend/wstest_uformer.html",
+    "backend/video_processor.html",
+    # "backend/image_processor.html", # To be added once created
 
     # --- Script for generating this state file ---
     "_code_state.py",

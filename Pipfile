@@ -25,6 +25,8 @@ h5py = "*"
 joblib = "*"
 natsort = "*"
 Pillow = "*"
+python-multipart = "*"
+ffmpeg-python = "*"
 
 [dev-packages]
 

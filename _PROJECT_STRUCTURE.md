@@ -19,6 +19,8 @@ noctura-uformer/
 │   │   │   └── image_utils.py
 │   │   └── model.py
 │   ├── debug_keys.txt
+│   ├── image_processor.html
+│   ├── video_processor.html
 │   └── wstest_uformer.html
 ├── datasets/
 │   └── SID/ (empty)
@@ -26,11 +28,36 @@ noctura-uformer/
 │   ├── public/ (empty)
 │   └── src/ (empty)
 ├── uformer_training/
-│   ├── dataset/ (empty)
-│   ├── script/ (empty)
-│   ├── train/ (empty)
-│   └── utils/ (empty)
+│   ├── dataset/
+│   │   ├── dataset_denoise.py
+│   │   └── dataset_motiondeblur.py
+│   ├── script/
+│   │   ├── test.sh
+│   │   ├── train_denoise.sh
+│   │   └── train_motiondeblur.sh
+│   ├── train/
+│   │   ├── train_denoise.py
+│   │   └── train_motiondeblur.py
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   ├── antialias.py
+│   │   ├── bundle_submissions.py
+│   │   ├── caculate_psnr_ssim.py
+│   │   ├── dataset_utils.py
+│   │   ├── dir_utils.py
+│   │   ├── image_utils.py
+│   │   ├── loader.py
+│   │   └── model_utils.py
+│   ├── warmup_scheduler/
+│   │   ├── __init__.py
+│   │   ├── run.py
+│   │   └── scheduler.py
+│   ├── generate_patches_SIDD.py
+│   ├── losses.py
+│   ├── model.py
+│   └── options.py
 ├── .gitignore
+├── _code_state.md
 ├── _code_state.py
 ├── _useful_commands.md
 └── requirements.txt

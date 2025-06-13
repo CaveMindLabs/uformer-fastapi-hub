@@ -3,13 +3,23 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>NocturaVision - Uformer Real-time Test</title>
+    <title>NocturaVision - Live Stream</title>
     <style>
         html, body { height: 100vh; margin: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #282c34; color: white; display: flex; flex-direction: column; }
-        header { background-color: #20232a; padding: 20px; text-align: center; flex-shrink: 0; }
-        header h1 { margin: 0 0 10px 0; font-size: 2.5rem; display: flex; align-items: center; justify-content: center; gap: 15px; }
-        header p { margin: 0; font-size: 1.1rem; color: #ccc; }
-        .page-content { display: flex; flex-direction: row; flex-grow: 1; padding: 20px; gap: 20px; box-sizing: border-box; min-height: 0; }
+        
+        /* --- Consistent Header --- */
+        header { background-color: #20232a; padding: 15px 30px; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; }
+        .nav-bar { display: flex; gap: 15px; }
+        .nav-button { padding: 8px 15px; border: 1px solid #61dafb; color: #61dafb; background-color: transparent; text-decoration: none; border-radius: 5px; cursor: pointer; font-size: 1rem; transition: background-color 0.2s, color 0.2s; }
+        .nav-button:hover { background-color: #4a4f5a; }
+        .nav-button.active { background-color: #61dafb; color: #20232a; font-weight: bold; }
+        .title-block { text-align: center; }
+        .title-block h1 { margin: 0 0 5px 0; font-size: 2.2rem; }
+        .title-block p { margin: 0; font-size: 1rem; color: #ccc; }
+        .placeholder { width: 235px; } /* Adjust this width to match nav-bar for perfect centering */
+
+        /* --- Page-Specific Content --- */
+        .page-content { display: flex; flex-grow: 1; padding: 20px; gap: 20px; box-sizing: border-box; min-height: 0; }
         .sidebar { flex: 0 0 350px; background-color: #3c4049; padding: 20px; border-radius: 8px; display: flex; flex-direction: column; gap: 25px; overflow-y: auto; }
         .sidebar h2 { margin-top: 0; border-bottom: 1px solid #61dafb; padding-bottom: 10px; color: #61dafb; }
         .control-group { display: flex; flex-direction: column; gap: 10px; }
@@ -31,12 +41,20 @@
 </head>
 <body>
     <header>
-        <h1>🦉 NocturaVision <span style="font-weight: 300; color: #ccc;">| Uformer</span></h1>
-        <p>Real-time Low-Light Enhancement</p>
+        <div class="nav-bar">
+            <a href="wstest_uformer.html" class="nav-button active">Live Stream</a>
+            <a href="video_processor.html" class="nav-button">Video File</a>
+            <a href="#" class="nav-button">Image File</a> <!-- To be implemented -->
+        </div>
+        <div class="title-block">
+            <h1>🦉 NocturaVision <span style="font-weight: 300; color: #ccc;">| Uformer</span></h1>
+            <p>Real-time Low-Light Enhancement</p>
+        </div>
+        <div class="placeholder"></div> <!-- This is for alignment -->
     </header>
     <div class="page-content">
         <div class="sidebar">
-            <h2>Video Controls</h2>
+            <h2>Live Controls</h2>
             <div class="control-group">
                 <label>Enhancement Model</label>
                 <p style="padding: 8px; background-color: #4a4f5a; border-radius: 4px; margin: 0;">Uformer (SIDD Pre-trained)</p>
@@ -128,8 +146,7 @@
             if (!isStreaming || !websocket || websocket.readyState !== WebSocket.OPEN) {
                 return;
             }
-            // NEW: Add a guard clause to wait for the webcam to be ready.
-            // This is the fix for the race condition.
+            // Fix for race condition: wait for webcam to be ready.
             if (!webcamVideo.videoWidth || !webcamVideo.videoHeight) {
                 requestAnimationFrame(processAndSendFrame); // Keep the loop alive
                 return; // And try again on the next frame
