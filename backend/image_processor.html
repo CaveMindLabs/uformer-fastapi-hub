@@ -1,1 +1,200 @@
 <!-- noctura-uformer/backend/image_processor.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>NocturaVision - Image File Processor</title>
+    <style>
+        html, body { height: 100vh; margin: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #282c34; color: white; display: flex; flex-direction: column; }
+        header { background-color: #20232a; padding: 15px 30px; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; }
+        .nav-bar { display: flex; gap: 15px; }
+        .nav-button { padding: 8px 15px; border: 1px solid #61dafb; color: #61dafb; background-color: transparent; text-decoration: none; border-radius: 5px; cursor: pointer; font-size: 1rem; transition: background-color 0.2s, color 0.2s; }
+        .nav-button:hover { background-color: #4a4f5a; }
+        .nav-button.active { background-color: #61dafb; color: #20232a; font-weight: bold; }
+        .title-block { text-align: center; }
+        .title-block h1 { margin: 0 0 5px 0; font-size: 2.2rem; }
+        .title-block p { margin: 0; font-size: 1rem; color: #ccc; }
+        .placeholder { width: 235px; }
+        .page-content { display: flex; flex-grow: 1; padding: 20px; gap: 20px; box-sizing: border-box; min-height: 0; }
+        .sidebar { flex: 0 0 350px; background-color: #3c4049; padding: 20px; border-radius: 8px; display: flex; flex-direction: column; gap: 25px; overflow-y: auto; }
+        .sidebar h2 { margin-top: 0; border-bottom: 1px solid #61dafb; padding-bottom: 10px; color: #61dafb; }
+        .control-group { display: flex; flex-direction: column; gap: 10px; }
+        .control-group label { font-weight: bold; font-size: 0.9rem; }
+        .main-content { flex-grow: 1; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+        .actions-bar { display: flex; align-items: center; gap: 20px; background-color: #4a4f5a; padding: 15px; border-radius: 8px; flex-shrink: 0; }
+        #processImageBtn { font-size: 1.1rem; padding: 10px 20px; cursor: pointer; border: none; border-radius: 5px; background-color: #61dafb; color: #20232a; font-weight: bold; transition: background-color 0.2s; }
+        #processImageBtn:hover:not(:disabled) { background-color: #52b8d8; }
+        #processImageBtn:disabled { background-color: #555; color: #888; cursor: not-allowed; }
+        #status { font-style: italic; color: #ccc; }
+        #status.error { color: #ff6b6b; font-weight: bold; }
+        .image-feeds-container { display: flex; gap: 20px; flex-grow: 1; min-height: 0; }
+        .image-box { flex: 1; background-color: #4a4f5a; border-radius: 8px; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 15px; min-width: 0; }
+        .image-header { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+        .image-header h3 { margin: 0; color: #61dafb; }
+        .image-header button, .image-header a { font-size: 0.9rem; padding: 8px 12px; border-radius: 5px; border: none; background-color: #61dafb; color: #20232a; font-weight: bold; cursor: pointer; text-decoration: none; }
+        .image-player-wrapper { width: 100%; height: 100%; background-color: #20232a; border-radius: 5px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .upload-area { border: 2px dashed #ccc; border-radius: 5px; padding: 20px; text-align: center; cursor: pointer; width: 80%; }
+        .image-display { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 5px; border: 2px solid #ccc; background-color: #20232a; box-sizing: border-box; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="nav-bar">
+            <a href="wstest_uformer.html" class="nav-button">Live Stream</a>
+            <a href="video_processor.html" class="nav-button">Video File</a>
+            <a href="image_processor.html" class="nav-button active">Image File</a>
+        </div>
+        <div class="title-block">
+            <h1>🦉 NocturaVision <span style="font-weight: 300; color: #ccc;">| Uformer</span></h1>
+            <p>Image File Enhancement</p>
+        </div>
+        <div class="placeholder"></div>
+    </header>
+    <div class="page-content">
+        <div class="sidebar">
+            <h2>Image Controls</h2>
+            <div class="control-group">
+                <label>Enhancement Model</label>
+                <p style="padding: 8px; background-color: #4a4f5a; border-radius: 4px; margin: 0;">Uformer (SIDD Pre-trained)</p>
+            </div>
+            <!-- Any future image-specific controls can go here -->
+        </div>
+        <div class="main-content">
+            <div class="actions-bar">
+                <button id="processImageBtn" disabled>Process Image</button>
+                <p id="status">Please select an image file.</p>
+            </div>
+            <div class="image-feeds-container">
+                <div class="image-box">
+                    <div class="image-header">
+                        <h3>Original Image</h3>
+                        <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+                        <button id="selectImageBtn">Select Image</button>
+                    </div>
+                    <div id="original-image-wrapper" class="image-player-wrapper">
+                        <div id="upload-area" class="upload-area">
+                            <p>Drag & Drop an image file here or click this area</p>
+                        </div>
+                        <img id="originalImage" class="image-display hidden" alt="Original Image">
+                    </div>
+                </div>
+                <div class="image-box">
+                    <div class="image-header">
+                        <h3>Enhanced Image</h3>
+                        <a id="downloadBtn" href="#" class="hidden" download>Download</a>
+                    </div>
+                    <div id="processed-image-wrapper" class="image-player-wrapper">
+                        <img id="processedImage" class="image-display hidden" alt="Processed Image">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        // DOM Elements
+        const selectImageBtn = document.getElementById('selectImageBtn');
+        const imageUploadInput = document.getElementById('imageUpload');
+        const uploadArea = document.getElementById('upload-area');
+        const originalImage = document.getElementById('originalImage');
+        const processedImage = document.getElementById('processedImage');
+        const processImageBtn = document.getElementById('processImageBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const statusSpan = document.getElementById('status');
+
+        let selectedImageFile = null;
+
+        // --- Event Listeners ---
+        selectImageBtn.onclick = () => imageUploadInput.click();
+        imageUploadInput.onchange = (event) => handleImageFile(event.target.files[0]);
+
+        uploadArea.ondragover = (event) => { event.preventDefault(); uploadArea.style.borderColor = '#61dafb'; };
+        uploadArea.ondragleave = (event) => { event.preventDefault(); uploadArea.style.borderColor = '#ccc'; };
+        uploadArea.ondrop = (event) => {
+            event.preventDefault();
+            uploadArea.style.borderColor = '#ccc';
+            if (event.dataTransfer.files && event.dataTransfer.files[0]) {
+                handleImageFile(event.dataTransfer.files[0]);
+            }
+        };
+        uploadArea.onclick = () => imageUploadInput.click();
+
+        processImageBtn.onclick = async () => {
+            if (!selectedImageFile) {
+                statusSpan.textContent = "Error: No image selected.";
+                statusSpan.classList.add('error');
+                return;
+            }
+
+            statusSpan.textContent = `Processing "${selectedImageFile.name}"...`;
+            statusSpan.classList.remove('error');
+            processImageBtn.disabled = true;
+            downloadBtn.classList.add('hidden');
+            processedImage.classList.add('hidden');
+
+            const formData = new FormData();
+            formData.append("image_file", selectedImageFile);
+
+            try {
+                // Endpoint to be created in the next step
+                const response = await fetch('http://127.0.0.1:8000/api/process_image', { 
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ detail: 'Server returned an unreadable error.' }));
+                    throw new Error(errorData.detail || `Server responded with status ${response.status}`);
+                }
+                
+                const blob = await response.blob(); // Get the response as a Blob
+                const imageUrl = URL.createObjectURL(blob); // Create a URL for the Blob
+
+                processedImage.src = imageUrl;
+                processedImage.classList.remove('hidden');
+                downloadBtn.href = imageUrl;
+                downloadBtn.download = `enhanced_${selectedImageFile.name}`; // Set download filename
+                downloadBtn.classList.remove('hidden');
+
+                statusSpan.textContent = "Image processing complete!";
+
+            } catch (error) {
+                statusSpan.classList.add('error');
+                statusSpan.textContent = `Error: ${error.message}. Is the backend running?`;
+            } finally {
+                processImageBtn.disabled = false;
+            }
+        };
+        
+        // --- Helper Functions ---
+        function handleImageFile(file) {
+            if (file && file.type.startsWith('image/')) {
+                selectedImageFile = file;
+                const imageURL = URL.createObjectURL(file);
+                
+                originalImage.src = imageURL;
+                originalImage.classList.remove('hidden');
+                uploadArea.classList.add('hidden');
+                
+                statusSpan.textContent = `Selected: "${file.name}". Ready to process.`;
+                statusSpan.classList.remove('error');
+                processedImage.src = "";
+                processedImage.classList.add('hidden');
+                downloadBtn.classList.add('hidden');
+                processImageBtn.disabled = false;
+            } else {
+                selectedImageFile = null;
+                statusSpan.textContent = "Please select a valid image file.";
+                statusSpan.classList.add('error');
+                originalImage.classList.add('hidden');
+                uploadArea.classList.remove('hidden');
+                processImageBtn.disabled = true;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // No specific DOMContentLoaded logic needed beyond initial hidden states
+        });
+    </script>
+</body>
+</html>

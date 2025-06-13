@@ -1303,7 +1303,9 @@ class Uformer(nn.Module):
 
         # Output Projection
         y = self.output_proj(deconv3)
-        return x + y if self.dd_in ==3 else y
+        # --- DIAGNOSTIC: Return only the network's residual 'y' to see what it's generating.
+        # The original line was: return x + y if self.dd_in ==3 else y
+        return y
 
     def flops(self):
         flops = 0
