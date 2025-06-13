@@ -125,9 +125,16 @@
         };
 
         function processAndSendFrame() {
-            if (!isStreaming || !websocket || websocket.readyState !== WebSocket.OPEN || !webcamVideo.videoWidth) {
+            if (!isStreaming || !websocket || websocket.readyState !== WebSocket.OPEN) {
                 return;
             }
+            // NEW: Add a guard clause to wait for the webcam to be ready.
+            // This is the fix for the race condition.
+            if (!webcamVideo.videoWidth || !webcamVideo.videoHeight) {
+                requestAnimationFrame(processAndSendFrame); // Keep the loop alive
+                return; // And try again on the next frame
+            }
+
             const canvas = document.createElement('canvas');
             canvas.width = webcamVideo.videoWidth;
             canvas.height = webcamVideo.videoHeight;

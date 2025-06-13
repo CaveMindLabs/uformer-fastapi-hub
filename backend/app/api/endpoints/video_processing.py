@@ -64,8 +64,11 @@ async def websocket_process_video(
             img_bytes = base64.b64decode(image_b64.split(',')[1]) # Handle 'data:image/jpeg;base64,' prefix
             image_pil = Image.open(io.BytesIO(img_bytes)).convert("RGB")
             
+            # Resize the image to the model's expected square size
+            image_pil_resized = image_pil.resize((256, 256), Image.Resampling.LANCZOS)
+            
             # Convert PIL Image to numpy array (HWC, RGB)
-            input_image_np_rgb = np.array(image_pil)
+            input_image_np_rgb = np.array(image_pil_resized)
             original_h, original_w, _ = input_image_np_rgb.shape
 
             # Pad image to a multiple of Uformer's window size (8)
@@ -78,10 +81,6 @@ async def websocket_process_video(
             enhanced_tensor = None
             if uformer_model is not None:
                 with torch.no_grad():
-                    # Uformer model output is typically x + y (input + residual) or just y (residual)
-                    # For SIDD, it's usually designed to learn the residual/clean image.
-                    # Based on model.py's forward: `return x + y if self.dd_in ==3 else y`
-                    # Since dd_in=3, it should return x + y.
                     enhanced_tensor = uformer_model(input_tensor)
             else:
                 # If model failed to load, return original image or an error indicator
@@ -121,8 +120,7 @@ async def websocket_process_video(
     except WebSocketDisconnect as e:
         print(f"[WS-BACKEND] XXX Client disconnected. Code: {e.code}, Reason: {e.reason}")
     except Exception as e:       
-        print(f"[WS-BACKEND] !!! An unexpected error occurred in WebSocket: {e}")
-        traceback.print_exc() # This will print the full stack trace to your terminal
+        print(f"[WS-BACKEND] !!! An error occurred in WebSocket: {e}")
         # Attempt to send an error message to the client before closing
         try:
             await websocket.send_json({"error": f"Server processing error: {e}"})
