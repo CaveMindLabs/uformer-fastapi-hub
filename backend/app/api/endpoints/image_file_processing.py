@@ -50,7 +50,8 @@ async def generate_preview(image_file: UploadFile = File(...)):
         if image_file.filename.lower().endswith(('.arw', '.nef', '.cr2', '.dng')):
             with rawpy.imread(io.BytesIO(contents)) as raw:
                 # Use postprocess to get a displayable sRGB image
-                rgb_array = raw.postprocess(use_camera_wb=True, output_color=rawpy.ColorSpace.sRGB, no_auto_bright=True)
+                # rgb_array = raw.postprocess(use_camera_wb=True, output_color=rawpy.ColorSpace.sRGB, no_auto_bright=True)
+                rgb_array = raw.postprocess(use_camera_wb=True, output_color=rawpy.ColorSpace.sRGB)
             img = Image.fromarray(rgb_array)
         # For standard images that might be huge
         else:
