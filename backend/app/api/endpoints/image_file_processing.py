@@ -108,15 +108,37 @@ async def process_image(
         if image_file.filename.lower().endswith('.arw'):
             print("[IMAGE_PROCESSOR] Detected .ARW RAW file.")
             with rawpy.imread(io.BytesIO(contents)) as raw:
-                # Post-process to get a 16-bit RGB image, disabling auto-brightness
+                # Post-process to get a linear 16-bit RGB image
                 rgb_16bit = raw.postprocess(gamma=(1, 1), no_auto_bright=True, output_bps=16)
-            # Normalize from [0, 65535] to [0, 1] for the model
-            input_full_res_np = (rgb_16bit / 65535.0).astype(np.float32)
+            
+            # --- CRITICAL FIX: Mimic the SIDD training pipeline ---
+            # 1. Normalize from [0, 65535] to float[0, 1]
+            input_linear_np = (rgb_16bit / 65535.0).astype(np.float32)
+            
+            # 2. Amplify the brightness. The ratio is a hyperparameter; 100-300 are common.
+            #    We are making the dark input brighter before feeding it to the model.
+            amplification_ratio = 200.0 
+            print(f"[IMAGE_PROCESSOR] Amplifying RAW image by ratio: {amplification_ratio}")
+            input_full_res_np = np.clip(input_linear_np * amplification_ratio, 0.0, 1.0)
         else:
             print("[IMAGE_PROCESSOR] Detected standard image file (JPG/PNG).")
             image_pil = Image.open(io.BytesIO(contents)).convert("RGB")
             # Convert to float and normalize to [0,1]
             input_full_res_np = (np.array(image_pil) / 255.0).astype(np.float32)
+
+        # --- SAVE THE PRE-PROCESSED/AMPLIFIED INPUT THAT THE MODEL WILL SEE ---
+        amplified_dir = os.path.join("temp", "images", "amplified_inputs")
+        os.makedirs(amplified_dir, exist_ok=True)
+        # Create a saveable uint8 version of the float array
+        amplified_image_to_save = (input_full_res_np * 255.0).astype(np.uint8)
+        
+        # Robustly get the filename base and force a .jpg extension
+        amplified_filename_base = os.path.splitext(image_file.filename)[0]
+        amplified_filename = f"{unique_id}_amplified_{amplified_filename_base}.jpg"
+        
+        amplified_filepath = os.path.join(amplified_dir, amplified_filename)
+        Image.fromarray(amplified_image_to_save).save(amplified_filepath)
+        print(f"[IMAGE_PROCESSOR] Saved amplified input image to: {amplified_filepath}")
 
         original_h, original_w, _ = input_full_res_np.shape
         print(f"[IMAGE_PROCESSOR] Original dimensions: {original_w}x{original_h}")

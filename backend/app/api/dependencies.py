@@ -14,43 +14,16 @@ async def load_uformer_model(model_path: str, device: torch.device):
     """
     Loads the Uformer model and its pre-trained weights.
     """
-    # model = Uformer(
-    #     img_size=256,
-    #     in_chans=3,
-    #     dd_in=3,
-    #     # embed_dim=32, # The correct embed_dim for Uformer-B SIDD
-    #     embed_dim=16, # The correct embed_dim for Uformer16
-    #     # depths=[1, 2, 8, 8, 2, 8, 8, 2, 1], # The correct depths for Uformer-B SIDD
-    #     depths=[2, 2, 2, 2, 2, 2, 2, 2, 2], # Depths for Uformer-B / Uformer16
-    #     # num_heads=[1, 2, 4, 8, 16, 16, 8, 4, 2], # The correct num_heads for Uformer-B SIDD
-    #     num_heads=[1, 2, 4, 8, 16, 16, 8, 4, 2], # Adjusted for embed_dim=16
-    #     win_size=8,
-    #     mlp_ratio=4.,
-    #     qkv_bias=True,
-    #     qk_scale=None,
-    #     drop_rate=0.,
-    #     attn_drop_rate=0.,
-    #     drop_path_rate=0.1,
-    #     norm_layer=nn.LayerNorm,
-    #     patch_norm=True,
-    #     use_checkpoint=False,
-    #     token_projection='linear',
-    #     token_mlp='leff',
-    #     dowsample=Downsample,
-    #     upsample=Upsample,
-    #     shift_flag=True,
-    #     # modulator=True, # modulator value for Uformer-B SIDD
-    #     modulator=False, # Adjusted for embed_dim=16
-    #     cross_modulator=False
-    # )
-
     model = Uformer(
         img_size=256,
         in_chans=3,
         dd_in=3,
-        embed_dim=32,                              # Uformer-B uses embed_dim 32
-        depths=[1, 2, 8, 8, 2, 8, 8, 2, 1],        # Official depths for Uformer-B
-        num_heads=[1, 2, 4, 8, 16, 16, 8, 4, 2],    # Official heads for Uformer-B
+        # embed_dim=32, # The correct embed_dim for Uformer-B SIDD
+        embed_dim=16, # The correct embed_dim for Uformer16
+        # depths=[1, 2, 8, 8, 2, 8, 8, 2, 1], # The correct depths for Uformer-B SIDD
+        depths=[2, 2, 2, 2, 2, 2, 2, 2, 2], # Depths for Uformer-B / Uformer16
+        # num_heads=[1, 2, 4, 8, 16, 16, 8, 4, 2], # The correct num_heads for Uformer-B SIDD
+        num_heads=[1, 2, 4, 8, 16, 16, 8, 4, 2], # Adjusted for embed_dim=16
         win_size=8,
         mlp_ratio=4.,
         qkv_bias=True,
@@ -66,9 +39,36 @@ async def load_uformer_model(model_path: str, device: torch.device):
         dowsample=Downsample,
         upsample=Upsample,
         shift_flag=True,
-        modulator=True,                           # Uformer-B SIDD model USES the modulator
+        # modulator=True, # modulator value for Uformer-B SIDD
+        modulator=False, # Adjusted for embed_dim=16
         cross_modulator=False
     )
+
+    # model = Uformer(
+    #     img_size=256,
+    #     in_chans=3,
+    #     dd_in=3,
+    #     embed_dim=32,                              # Uformer-B uses embed_dim 32
+    #     depths=[1, 2, 8, 8, 2, 8, 8, 2, 1],        # Official depths for Uformer-B
+    #     num_heads=[1, 2, 4, 8, 16, 16, 8, 4, 2],    # Official heads for Uformer-B
+    #     win_size=8,
+    #     mlp_ratio=4.,
+    #     qkv_bias=True,
+    #     qk_scale=None,
+    #     drop_rate=0.,
+    #     attn_drop_rate=0.,
+    #     drop_path_rate=0.1,
+    #     norm_layer=nn.LayerNorm,
+    #     patch_norm=True,
+    #     use_checkpoint=False,
+    #     token_projection='linear',
+    #     token_mlp='leff',
+    #     dowsample=Downsample,
+    #     upsample=Upsample,
+    #     shift_flag=True,
+    #     modulator=True,                           # Uformer-B SIDD model USES the modulator
+    #     cross_modulator=False
+    # )
 
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"Uformer model weights not found at: {model_path}")
