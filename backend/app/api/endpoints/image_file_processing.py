@@ -94,6 +94,16 @@ async def process_image(
         
         contents = await image_file.read()
         
+        # --- Save the original uploaded file, REGARDLESS of type ---
+        unique_id = f"{int(time.time())}_{uuid.uuid4().hex[:8]}"
+        image_upload_dir = os.path.join("temp", "images", "uploads")
+        os.makedirs(image_upload_dir, exist_ok=True)
+        original_filename = f"{unique_id}_original_fullres_{image_file.filename}"
+        original_filepath = os.path.join(image_upload_dir, original_filename)
+        with open(original_filepath, "wb") as f:
+            f.write(contents)
+        print(f"[IMAGE_PROCESSOR] Saved original full-res image to: {original_filepath}")
+
         # --- Handle different image types (.ARW vs standard) ---
         if image_file.filename.lower().endswith('.arw'):
             print("[IMAGE_PROCESSOR] Detected .ARW RAW file.")
@@ -104,16 +114,6 @@ async def process_image(
             input_full_res_np = (rgb_16bit / 65535.0).astype(np.float32)
         else:
             print("[IMAGE_PROCESSOR] Detected standard image file (JPG/PNG).")
-            # --- FIX: Save original uploaded file ---
-            unique_id = f"{int(time.time())}_{uuid.uuid4().hex[:8]}"
-            image_upload_dir = os.path.join("temp", "images", "uploads")
-            os.makedirs(image_upload_dir, exist_ok=True)
-            original_filename = f"{unique_id}_original_fullres_{image_file.filename}"
-            original_filepath = os.path.join(image_upload_dir, original_filename)
-            with open(original_filepath, "wb") as f:
-                f.write(contents)
-            print(f"[IMAGE_PROCESSOR] Saved original full-res image to: {original_filepath}")
-            
             image_pil = Image.open(io.BytesIO(contents)).convert("RGB")
             # Convert to float and normalize to [0,1]
             input_full_res_np = (np.array(image_pil) / 255.0).astype(np.float32)
