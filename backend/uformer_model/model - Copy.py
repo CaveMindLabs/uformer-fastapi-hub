@@ -1268,66 +1268,41 @@ class Uformer(nn.Module):
         return f"embed_dim={self.embed_dim}, token_projection={self.token_projection}, token_mlp={self.mlp},win_size={self.win_size}"
 
     def forward(self, x, mask=None):
-        # --- START OF DIAGNOSTIC LOGGING ---
-        def log_stats(tensor, name):
-            # print(f"[UFORMER_FORWARD] {name}: "
-            #       f"mean={tensor.mean():.4f}, std={tensor.std():.4f}, "
-            #       f"min={tensor.min():.4f}, max={tensor.max():.4f}, shape={tensor.shape}")
-            pass
-
-        # print("\n--- [UFORMER_FORWARD] Starting a new forward pass ---")
-        log_stats(x, "Input `x`")
-
         # Input Projection
         y = self.input_proj(x)
         y = self.pos_drop(y)
-        log_stats(y, "After InputProj `y`")
-
         #Encoder
         conv0 = self.encoderlayer_0(y,mask=mask)
-        log_stats(conv0, "After Encoder 0")
         pool0 = self.dowsample_0(conv0)
         conv1 = self.encoderlayer_1(pool0,mask=mask)
-        log_stats(conv1, "After Encoder 1")
         pool1 = self.dowsample_1(conv1)
         conv2 = self.encoderlayer_2(pool1,mask=mask)
-        log_stats(conv2, "After Encoder 2")
         pool2 = self.dowsample_2(conv2)
         conv3 = self.encoderlayer_3(pool2,mask=mask)
-        log_stats(conv3, "After Encoder 3")
         pool3 = self.dowsample_3(conv3)
 
         # Bottleneck
         conv4 = self.conv(pool3, mask=mask)
-        log_stats(conv4, "After Bottleneck")
 
         #Decoder
         up0 = self.upsample_0(conv4)
         deconv0 = torch.cat([up0,conv3],-1)
         deconv0 = self.decoderlayer_0(deconv0,mask=mask)
-        log_stats(deconv0, "After Decoder 0")
         
         up1 = self.upsample_1(deconv0)
         deconv1 = torch.cat([up1,conv2],-1)
         deconv1 = self.decoderlayer_1(deconv1,mask=mask)
-        log_stats(deconv1, "After Decoder 1")
 
         up2 = self.upsample_2(deconv1)
         deconv2 = torch.cat([up2,conv1],-1)
         deconv2 = self.decoderlayer_2(deconv2,mask=mask)
-        log_stats(deconv2, "After Decoder 2")
 
         up3 = self.upsample_3(deconv2)
         deconv3 = torch.cat([up3,conv0],-1)
         deconv3 = self.decoderlayer_3(deconv3,mask=mask)
-        log_stats(deconv3, "After Decoder 3")
 
         # Output Projection
         y = self.output_proj(deconv3)
-        log_stats(y, "Final Residual `y`")
-        # print("--- [UFORMER_FORWARD] Forward pass complete ---\n")
-        # --- END OF DIAGNOSTIC LOGGING ---
-
         return x + y if self.dd_in ==3 else y
 
     def flops(self):

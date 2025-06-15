@@ -27,6 +27,7 @@ natsort = "*"
 Pillow = "*"
 python-multipart = "*"
 ffmpeg-python = "*"
+rawpy = "*"
 
 [dev-packages]
 

@@ -7,7 +7,7 @@ import torch
 
 # Import the model loading dependency AND the app_models dictionary
 from app.api.dependencies import load_uformer_model, app_models
-from app.api.endpoints import file_processing, image_processing, video_processing
+from app.api.endpoints import image_file_processing, video_file_processing, live_stream_processing
 
 
 # Using asynccontextmanager to manage application startup/shutdown events
@@ -67,9 +67,9 @@ app.add_middleware(
 )
 
 # --- ALL ROUTERS MUST BE INCLUDED ---
-app.include_router(video_processing.router, tags=["video_streaming"])
-app.include_router(file_processing.router, tags=["file_processing"])
-app.include_router(image_processing.router, tags=["image_processing"]) 
+app.include_router(live_stream_processing.router, tags=["live_stream_processing"])
+app.include_router(video_file_processing.router, tags=["video_file_processing"])
+app.include_router(image_file_processing.router, tags=["image_file_processing"])
 
 @app.get("/health", tags=["healthcheck"])
 async def health_check():

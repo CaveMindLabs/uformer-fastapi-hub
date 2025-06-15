@@ -50,7 +50,10 @@ pipenv install torch torchvision torchaudio --index https://download.pytorch.org
 ~~~bash
 # Start the Server (MUST be run from project root):
 cd backend
+
 pipenv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+OR
+pipenv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --no-access-log
 
 # Run the Test Client:
     # Navigate to the noctura-uformer/backend/ directory in your file explorer.

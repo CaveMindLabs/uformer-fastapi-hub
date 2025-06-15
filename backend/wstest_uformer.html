@@ -62,6 +62,12 @@
             <div class="control-group checkbox-group">
                 <label><input type="checkbox" id="fpsCheckbox" checked> Show FPS Counter</label>
             </div>
+            <div class="control-group checkbox-group">
+                <label>
+                    <input type="checkbox" id="patchCheckbox"> Use Patch Processing
+                    <span id="patchWarning" style="color: #ff6b6b; font-weight: bold; display: none;"> (Not Recommended: Very Slow)</span>
+                </label>
+            </div>
         </div>
         <div class="main-content">
             <div class="actions-bar">
@@ -89,6 +95,8 @@
         const processedImage = document.getElementById('processedImage');
         const statusSpan = document.getElementById('status');
         const fpsCheckbox = document.getElementById('fpsCheckbox');
+        const patchCheckbox = document.getElementById('patchCheckbox');
+        const patchWarning = document.getElementById('patchWarning');
 
         let websocket;
         let stream;
@@ -142,6 +150,10 @@
             stopStreaming();
         };
 
+        patchCheckbox.onchange = () => {
+            patchWarning.style.display = patchCheckbox.checked ? 'inline' : 'none';
+        };
+
         function processAndSendFrame() {
             if (!isStreaming || !websocket || websocket.readyState !== WebSocket.OPEN) {
                 return;
@@ -164,7 +176,8 @@
 
             const payload = {
                 image_b64: dataUrl,
-                show_fps: fpsCheckbox.checked
+                show_fps: fpsCheckbox.checked,
+                use_patch_processing: patchCheckbox.checked
             };
             websocket.send(JSON.stringify(payload));
         }

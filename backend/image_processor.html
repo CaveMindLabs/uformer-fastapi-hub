@@ -58,6 +58,9 @@
                 <label>Enhancement Model</label>
                 <p style="padding: 8px; background-color: #4a4f5a; border-radius: 4px; margin: 0;">Uformer (SIDD Pre-trained)</p>
             </div>
+            <div class="control-group checkbox-group">
+                <label><input type="checkbox" id="patchCheckbox" checked> Use Patch Processing (High Quality)</label>
+            </div>
             <!-- Any future image-specific controls can go here -->
         </div>
         <div class="main-content">
@@ -69,7 +72,7 @@
                 <div class="image-box">
                     <div class="image-header">
                         <h3>Original Image</h3>
-                        <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+                        <input type="file" id="imageUpload" accept="image/jpeg,image/png,image/gif,image/webp,.arw" style="display: none;">
                         <button id="selectImageBtn">Select Image</button>
                     </div>
                     <div id="original-image-wrapper" class="image-player-wrapper">
@@ -101,6 +104,7 @@
         const processImageBtn = document.getElementById('processImageBtn');
         const downloadBtn = document.getElementById('downloadBtn');
         const statusSpan = document.getElementById('status');
+        const patchCheckbox = document.getElementById('patchCheckbox');
 
         let selectedImageFile = null;
 
@@ -134,6 +138,7 @@
 
             const formData = new FormData();
             formData.append("image_file", selectedImageFile);
+            formData.append("use_patch_processing", patchCheckbox.checked);
 
             try {
                 // Endpoint to be created in the next step
@@ -167,29 +172,52 @@
         };
         
         // --- Helper Functions ---
-        function handleImageFile(file) {
-            if (file && file.type.startsWith('image/')) {
-                selectedImageFile = file;
-                const imageURL = URL.createObjectURL(file);
-                
-                originalImage.src = imageURL;
-                originalImage.classList.remove('hidden');
-                uploadArea.classList.add('hidden');
-                
+        async function handleImageFile(file) {
+            if (!file) return;
+
+            selectedImageFile = file;
+            const isRaw = file.name.toLowerCase().endsWith('.arw');
+
+            originalImage.classList.remove('hidden');
+            uploadArea.classList.add('hidden');
+            statusSpan.textContent = `Loading preview for "${file.name}"...`;
+            statusSpan.classList.remove('error');
+            originalImage.src = ""; // Clear previous image
+
+            try {
+                let previewUrl;
+                if (isRaw) {
+                    // For RAW files, we must ask the server to generate a JPG preview
+                    const formData = new FormData();
+                    formData.append("image_file", file);
+                    const response = await fetch('http://127.0.0.1:8000/api/generate_preview', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    if (!response.ok) throw new Error('Server could not generate preview.');
+                    const blob = await response.blob();
+                    previewUrl = URL.createObjectURL(blob);
+                } else {
+                    // For standard images, the browser can display them directly
+                    previewUrl = URL.createObjectURL(file);
+                }
+                originalImage.src = previewUrl;
                 statusSpan.textContent = `Selected: "${file.name}". Ready to process.`;
-                statusSpan.classList.remove('error');
-                processedImage.src = "";
-                processedImage.classList.add('hidden');
-                downloadBtn.classList.add('hidden');
                 processImageBtn.disabled = false;
-            } else {
-                selectedImageFile = null;
-                statusSpan.textContent = "Please select a valid image file.";
+
+            } catch (error) {
+                console.error("Preview Error:", error);
+                statusSpan.textContent = `Error: Could not load preview for "${file.name}".`;
                 statusSpan.classList.add('error');
                 originalImage.classList.add('hidden');
                 uploadArea.classList.remove('hidden');
                 processImageBtn.disabled = true;
             }
+
+            // Reset the processed side
+            processedImage.src = "";
+            processedImage.classList.add('hidden');
+            downloadBtn.classList.add('hidden');
         }
 
         document.addEventListener('DOMContentLoaded', () => {
