@@ -15,7 +15,7 @@ __pycache__/
 
 # --- Generated & Temporary Files ---
 # Log files for model key debugging
-backend/logs/
+backend/debug_logs/
 debug_keys.txt
 # Build artifacts
 /build/

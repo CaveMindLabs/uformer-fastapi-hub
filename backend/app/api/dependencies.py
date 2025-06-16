@@ -10,42 +10,39 @@ from uformer_model.model import Uformer, Downsample, Upsample
 # --- DEFINE THE SHARED STATE DICTIONARY HERE ---
 app_models: Dict[str, Any] = {} # This will hold the loaded Uformer model and device
 
-def _load_single_model(model_definition: Uformer, model_path: str, device: torch.device) -> Uformer:
-    """Helper function to load state dict for a given model instance."""
+def _load_single_model(model_definition: Uformer, model_path: str, model_key: str, debug_log_dir: str, device: torch.device) -> Uformer:
+    """Helper function to load state dict for a given model instance and log its keys."""
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"Uformer model weights not found at: {model_path}")
 
     checkpoint = torch.load(model_path, map_location=device)
-    
     state_dict_to_load = checkpoint.get('state_dict', checkpoint)
-        
     new_state_dict = {k[7:] if k.startswith('module.') else k: v for k, v in state_dict_to_load.items()}
 
-    # --- START OF DEBUGGING CODE ---
-    # This will write the keys to a file in the `backend/` directory.
-    debug_output_path = 'debug_keys.txt'
+    # --- DEBUGGING CODE ---
+    # This will write the keys to a separate file for each model in the debug_log_dir.
+    os.makedirs(debug_log_dir, exist_ok=True) # Ensure debug directory exists
+    debug_output_path = os.path.join(debug_log_dir, f'debug_keys_{model_key}.txt')
     try:
         with open(debug_output_path, 'w') as f:
-            f.write("--- DEBUG: KEYS IN OUR MODEL DEFINITION ---\n")
-            # Sorting the keys makes comparison much easier
+            f.write(f"--- DEBUG: KEYS IN OUR MODEL DEFINITION FOR '{model_key}' ---\n")
             for key in sorted(model_definition.state_dict().keys()):
                 f.write(f"{key}\n")
 
-            f.write("\n\n--- DEBUG: KEYS IN THE LOADED .PTH FILE ---\n")
-            # Sorting the keys here too is crucial
+            f.write(f"\n\n--- DEBUG: KEYS IN THE LOADED .PTH FILE FOR '{model_key}' ---\n")
             for key in sorted(new_state_dict.keys()):
                 f.write(f"{key}\n")
         
-        print(f"\n\n--- DEBUG: Wrote model keys to '{debug_output_path}' in the backend/ directory. Please provide its content. ---\n\n")
+        print(f"\n--- DEBUG: Wrote model keys for '{model_key}' to '{debug_output_path}'. ---")
 
     except Exception as e:
-        print(f"--- DEBUG: FAILED TO WRITE DEBUG FILE: {e} ---")
+        print(f"--- DEBUG: FAILED TO WRITE DEBUG FILE FOR '{model_key}': {e} ---")
     # --- END OF DEBUGGING CODE ---
 
     model_definition.load_state_dict(new_state_dict, strict=True)
     model_definition.to(device)
     model_definition.eval()
-    print(f"Successfully loaded model from {os.path.basename(model_path)}")
+    print(f"Successfully loaded model from {os.path.basename(model_path)} as '{model_key}'.")
     return model_definition
 
 
@@ -54,6 +51,7 @@ async def load_models(device: torch.device):
     Loads all Uformer models and their pre-trained weights into the app_models dictionary.
     """
     base_path = os.path.join(os.path.dirname(__file__), '..', '..', 'model_weights', 'official_pretrained')
+    debug_log_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'debug_logs'))
 
     # --- 1. Define Uformer-B (High Quality Denoise) ---
     uformer_b_denoise = Uformer(
@@ -108,16 +106,20 @@ async def load_models(device: torch.device):
         modulator=False, # Adjusted for embed_dim=16
         cross_modulator=False
     )
-    
+
     # --- Load weights and store models ---
     app_models['denoise_b'] = _load_single_model(
         uformer_b_denoise,
         os.path.join(base_path, 'Uformer_B_SIDD.pth'),
+        'denoise_b', # Model key for debug file name
+        debug_log_dir, # Pass the debug directory
         device
     )
     app_models['denoise_16'] = _load_single_model(
         uformer_16_denoise,
         os.path.join(base_path, 'uformer16_denoising_sidd.pth'),
+        'denoise_16', # Model key for debug file name
+        debug_log_dir, # Pass the debug directory
         device
     )
 
