@@ -57,7 +57,23 @@
         .image-header button, .image-header a { font-size: 0.9rem; padding: 8px 12px; border-radius: 5px; border: none; background-color: #61dafb; color: #20232a; font-weight: bold; cursor: pointer; text-decoration: none; }
         .image-player-wrapper { width: 100%; height: 100%; background-color: #20232a; border-radius: 5px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
         .upload-area { border: 2px dashed #ccc; border-radius: 5px; padding: 20px; text-align: center; cursor: pointer; width: 80%; }
-        .image-display { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 5px; border: 2px solid #ccc; background-color: #20232a; box-sizing: border-box; }
+        .image-player-wrapper { 
+            overflow: hidden; /* This is the key to containing the zoomed image */
+        }
+        .image-display { 
+            max-width: 100%; 
+            max-height: 100%; 
+            object-fit: contain; 
+            border-radius: 5px; 
+            border: 2px solid #ccc; 
+            background-color: #20232a; 
+            box-sizing: border-box; 
+            transition: transform 0.1s ease-out; /* Smooth transitions for transforms */
+            cursor: grab;
+        }
+        .image-display.panning {
+            cursor: grabbing;
+        }
         .hidden { display: none; }
     </style>
 </head>
@@ -369,11 +385,85 @@
             populateModelSelect(event.target.value);
         });
 
+        // --- In-Place Pan and Zoom Logic ---
+        function setupPanAndZoom() {
+            const images = [originalImage, processedImage];
+            images.forEach(img => {
+                let scale = 1, panning = false,
+                    pointX = 0, pointY = 0,
+                    startX = 0, startY = 0;
+
+                // Reset function for double-click
+                const resetTransform = () => {
+                    scale = 1; pointX = 0; pointY = 0;
+                    img.style.transform = `translate(${pointX}px, ${pointY}px) scale(${scale})`;
+                    img.style.transformOrigin = `0 0`;
+                };
+
+                // Function to apply the current transform
+                const applyTransform = () => {
+                    img.style.transform = `translate(${pointX}px, ${pointY}px) scale(${scale})`;
+                };
+
+                // Double-click to reset
+                img.addEventListener('dblclick', resetTransform);
+
+                // Mouse wheel to zoom
+                img.parentElement.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    if (img.classList.contains('hidden')) return;
+
+                    const rect = img.getBoundingClientRect();
+                    const x = (e.clientX - rect.left) / scale;
+                    const y = (e.clientY - rect.top) / scale;
+
+                    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                    const newScale = Math.max(1, scale * delta); // Prevent zooming out too much
+
+                    pointX += (x - x / (newScale / scale)) * newScale;
+                    pointY += (y - y / (newScale / scale)) * newScale;
+                    scale = newScale;
+                    
+                    applyTransform();
+                });
+
+                // Mouse down to start panning
+                img.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    if (img.classList.contains('hidden')) return;
+
+                    panning = true;
+                    img.classList.add('panning');
+                    startX = e.clientX - pointX;
+                    startY = e.clientY - pointY;
+                });
+                
+                // Mouse up to stop panning
+                window.addEventListener('mouseup', () => {
+                    panning = false;
+                    img.classList.remove('panning');
+                });
+
+                // Mouse move to pan
+                window.addEventListener('mousemove', (e) => {
+                    if (!panning) return;
+                    e.preventDefault();
+                    pointX = e.clientX - startX;
+                    pointY = e.clientY - startY;
+                    applyTransform();
+                });
+
+                // Reset when image source changes
+                new MutationObserver(resetTransform).observe(img, { attributeFilter: ['src'] });
+            });
+        }
+
         // Initial load
         document.addEventListener('DOMContentLoaded', () => {
             updateCacheStatus();
-            toggleClearButtonState(); // Set initial button state on page load
-            populateModelSelect(taskSelect.value); // Populate models based on initial task selection
+            toggleClearButtonState();
+            populateModelSelect(taskSelect.value);
+            setupPanAndZoom(); // Activate the new pan and zoom functionality
         });
     </script>
 </body>
