@@ -74,11 +74,17 @@
     <div class="page-content">
         <div class="sidebar">
             <h2>Live Controls</h2>
+            <div class="control-group" id="taskControlGroup" style="background-color: #31353c; border: 1px solid #61dafb; padding: 15px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);">
+                <label for="taskSelect" style="color: #61dafb;">Task</label>
+                <select id="taskSelect" style="padding: 8px; font-size: 1rem; border-radius: 4px; border: 1px solid #61dafb; background-color: #4a4f5a; color: white;">
+                    <option value="denoise">Denoise</option>
+                    <option value="deblur">Deblur</option>
+                </select>
+            </div>
             <div class="control-group">
                 <label for="modelSelect">Enhancement Model</label>
                 <select id="modelSelect" style="padding: 8px; font-size: 1rem; border-radius: 4px; border: 1px solid #61dafb; background-color: #4a4f5a; color: white;">
-                    <option value="denoise_b">Uformer-B (High Quality)</option>
-                    <option value="denoise_16" selected>Uformer-16 (Fast)</option>
+                    <!-- Options will be dynamically populated by JavaScript -->
                 </select>
             </div>
             <div class="control-group checkbox-group">
@@ -116,6 +122,7 @@
         const webcamVideo = document.getElementById('webcam');
         const processedImage = document.getElementById('processedImage');
         const statusSpan = document.getElementById('status');
+        const taskSelect = document.getElementById('taskSelect');
         const modelSelect = document.getElementById('modelSelect');
         const fpsCheckbox = document.getElementById('fpsCheckbox');
         const patchCheckbox = document.getElementById('patchCheckbox');
@@ -205,6 +212,7 @@
 
             const payload = {
                 image_b64: dataUrl,
+                task_type: taskSelect.value, // Add task type
                 model_name: modelSelect.value,
                 show_fps: fpsCheckbox.checked,
                 use_patch_processing: patchCheckbox.checked
@@ -282,10 +290,48 @@
             }
         };
 
+        // --- Model and Task Management ---
+        const modelsByTask = {
+            denoise: [
+                { value: 'denoise_b', text: 'Uformer-B (High Quality)' },
+                { value: 'denoise_16', text: 'Uformer-16 (Fast)' }
+            ],
+            deblur: [
+                { value: 'deblur_b', text: 'Uformer-B (Deblur)' }
+            ]
+        };
+
+        function populateModelSelect(taskType) {
+            modelSelect.innerHTML = ''; // Clear existing options
+            const models = modelsByTask[taskType];
+            if (models) {
+                models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model.value;
+                    option.textContent = model.text;
+                    
+                    // Set 'Uformer-16 (Fast)' as default for 'denoise' task, or select the only option available
+                    if (taskType === 'denoise' && model.value === 'denoise_16') {
+                        option.selected = true;
+                    } else if (models.length === 1) { // If there's only one model for a task, select it
+                        option.selected = true;
+                    }
+
+                    modelSelect.appendChild(option);
+                });
+            }
+        }
+
+        // Event listener for task selection change
+        taskSelect.addEventListener('change', (event) => {
+            populateModelSelect(event.target.value);
+        });
+
         // Initial load
         document.addEventListener('DOMContentLoaded', () => {
             updateCacheStatus();
             toggleClearButtonState(); // Set initial button state on page load
+            populateModelSelect(taskSelect.value); // Populate models based on initial task selection
         });
     </script>
 </body>

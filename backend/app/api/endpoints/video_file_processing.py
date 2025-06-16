@@ -126,11 +126,14 @@ def video_processing_task(task_id: str, input_path: str, output_path: str, model
 async def process_video(
     background_tasks: BackgroundTasks,
     video_file: UploadFile = File(...),
+    task_type: str = Form("denoise"), # Add task_type from frontend
     model_name: str = Form("denoise_b"),
     models: Dict[str, Any] = Depends(get_models)
 ):
-    video_upload_dir = os.path.join("temp", "videos", "uploads")
-    video_output_dir = os.path.join("temp", "videos", "processed")
+    # Define task-specific subdirectories
+    base_temp_dir = os.path.join("temp", "videos", task_type)
+    video_upload_dir = os.path.join(base_temp_dir, "uploads")
+    video_output_dir = os.path.join(base_temp_dir, "processed")
     os.makedirs(video_upload_dir, exist_ok=True)
     os.makedirs(video_output_dir, exist_ok=True)
 
@@ -139,7 +142,7 @@ async def process_video(
     input_path = os.path.join(video_upload_dir, f"{task_id}_{sanitized_filename}")
     
     output_filename_base, _ = os.path.splitext(sanitized_filename)
-    output_path = os.path.join(video_output_dir, f"enhanced_{task_id}_{output_filename_base}.mp4")
+    output_path = os.path.join(video_output_dir, f"enhanced_{task_type}_{task_id}_{output_filename_base}.mp4")
 
     with open(input_path, "wb") as buffer:
         buffer.write(await video_file.read())
@@ -162,12 +165,13 @@ async def get_video_status(task_id: str):
 
 @router.get("/api/download_video")
 async def download_video(filepath: str):
-    allowed_dir = os.path.abspath(os.path.join("temp", "videos", "processed"))
+    # Allow downloads from anywhere within the 'temp/videos' directory
+    allowed_base_dir = os.path.abspath(os.path.join("temp", "videos"))
     requested_path = os.path.abspath(filepath)
 
-    if not requested_path.startswith(allowed_dir):
+    if not requested_path.startswith(allowed_base_dir):
         raise HTTPException(status_code=403, detail="Access denied: File is outside the allowed directory.")
-    
+
     if not os.path.exists(requested_path):
         raise HTTPException(status_code=404, detail="File not found.")
 
