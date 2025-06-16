@@ -23,19 +23,31 @@ py --version       # Should output your default, Python 3.12.10
 python ../_list_structure.py -h
 
 # Basic invocation
-## Execute with defaults (project_root defaults to . and depth defaults to 6):
+## Execute with defaults (project_root defaults to . and depth defaults to 6).
+## File sizes will be displayed by default:
 python ../_list_structure.py
+
 ## To list the structure of the current directory, to 6 levels deep:
 python ../_list_structure.py . --depth 6
+
 ## Or equivalently (since project_root defaults to .):
 python ../_list_structure.py --depth 6
 
-# Pointing at a specific project
-## If your repo lives in /home/you/myproj, and you want full depth (8):
-python ../_list_structure.py /home/you/myproj
-## Or to limit to 3:
-python ../_list_structure.py /home/you/myproj --depth 3
+# Controlling file size display
+## List structure, explicitly showing file sizes (this is the default behavior):
+python ../_list_structure.py --depth 3 # Will show sizes
+python ../_list_structure.py . --depth 5
 
+## List structure WITHOUT showing file sizes:
+python ../_list_structure.py --depth 3 --no-size
+python ../_list_structure.py . --depth 5 --no-size
+
+# Pointing at a specific project
+## If your repo lives in /home/you/myproj, and you want full depth (8) with sizes:
+python ../_list_structure.py /home/you/myproj
+
+## Or to limit to 3, without showing sizes:
+python ../_list_structure.py /home/you/myproj --depth 3 --no-size
 ```
 
 ---

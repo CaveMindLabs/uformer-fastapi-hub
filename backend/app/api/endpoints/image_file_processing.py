@@ -73,14 +73,14 @@ async def generate_preview(image_file: UploadFile = File(...)):
 @router.post("/api/process_image")
 async def process_image(
     image_file: UploadFile = File(...),
+    task_type: str = Form("denoise"), # New parameter from frontend
     model_name: str = Form("denoise_b"),
     use_patch_processing: bool = Form(True),
     models: Dict[str, Any] = Depends(get_models)
 ):
     """
-    Accepts an image file, processes it using the selected Uformer model, and returns the enhanced image.
-    This pipeline now correctly handles RAW files by first developing them into a standard
-    sRGB format that matches the model's training data.
+    Accepts an image file, processes it using the selected Uformer model and task, 
+    and returns the enhanced image. Saves files into task-specific subdirectories.
     """
     if model_name not in models:
         raise HTTPException(status_code=400, detail=f"Invalid model name: {model_name}. Available models: {[k for k in models if k != 'device']}")
@@ -90,13 +90,21 @@ async def process_image(
     patch_size = 256
 
     try:
-        print(f"--- [IMAGE_PROCESSOR] New Job for: {image_file.filename} ---")
+        print(f"--- [IMAGE_PROCESSOR] New Job for: {image_file.filename} (Task: {task_type}) ---")
         contents = await image_file.read()
+
+        # Define task-specific subdirectories
+        base_temp_dir = os.path.join("temp", "images", task_type)
+        image_upload_dir = os.path.join(base_temp_dir, "uploads")
+        developed_dir = os.path.join(base_temp_dir, "developed_inputs")
+        image_processed_dir = os.path.join(base_temp_dir, "processed")
+        
+        # Ensure all directories exist
+        for dir_path in [image_upload_dir, developed_dir, image_processed_dir]:
+            os.makedirs(dir_path, exist_ok=True)
 
         # --- Save the original uploaded file ---
         unique_id = f"{int(time.time())}_{uuid.uuid4().hex[:8]}"
-        image_upload_dir = os.path.join("temp", "images", "uploads")
-        os.makedirs(image_upload_dir, exist_ok=True)
         original_filename = f"{unique_id}_original_fullres_{image_file.filename}"
         original_filepath = os.path.join(image_upload_dir, original_filename)
         with open(original_filepath, "wb") as f:
@@ -116,8 +124,6 @@ async def process_image(
             input_np_8bit = np.array(Image.open(io.BytesIO(contents)).convert("RGB"))
         
         # --- Save the "developed" input that the model will see ---
-        developed_dir = os.path.join("temp", "images", "developed_inputs")
-        os.makedirs(developed_dir, exist_ok=True)
         developed_filename_base = os.path.splitext(image_file.filename)[0]
         developed_filename = f"{unique_id}_developed_{developed_filename_base}.jpg"
         Image.fromarray(input_np_8bit).save(os.path.join(developed_dir, developed_filename))
@@ -156,8 +162,6 @@ async def process_image(
         img_byte_arr = io.BytesIO()
         pil_output_image.save(img_byte_arr, format='JPEG', quality=95)
         
-        image_processed_dir = os.path.join("temp", "images", "processed")
-        os.makedirs(image_processed_dir, exist_ok=True)
         processed_filename_base = os.path.splitext(image_file.filename)[0]
         processed_filename = f"{unique_id}_processed_{processed_filename_base}.jpg"
         with open(os.path.join(image_processed_dir, processed_filename), "wb") as f:

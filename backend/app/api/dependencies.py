@@ -107,19 +107,52 @@ async def load_models(device: torch.device):
         cross_modulator=False
     )
 
+    # --- 3. Define Uformer-B (Deblur) ---
+    uformer_b_deblur = Uformer(
+        img_size=256,
+        in_chans=3, dd_in=3,
+        embed_dim=32,                              # Uformer-B uses embed_dim 32
+        depths=[1, 2, 8, 8, 2, 8, 8, 2, 1],        # Official depths for Uformer-B
+        num_heads=[1, 2, 4, 8, 16, 16, 8, 4, 2],    # Official heads for Uformer-B
+        win_size=8,
+        mlp_ratio=4.,
+        qkv_bias=True,
+        qk_scale=None,
+        drop_rate=0.,
+        attn_drop_rate=0.,
+        drop_path_rate=0.1,
+        norm_layer=nn.LayerNorm,
+        patch_norm=True,
+        use_checkpoint=False,
+        token_projection='linear',
+        token_mlp='leff',
+        dowsample=Downsample,
+        upsample=Upsample,
+        shift_flag=True,
+        modulator=True,
+        cross_modulator=False
+    )
+    
     # --- Load weights and store models ---
     app_models['denoise_b'] = _load_single_model(
         uformer_b_denoise,
         os.path.join(base_path, 'Uformer_B_SIDD.pth'),
-        'denoise_b', # Model key for debug file name
-        debug_log_dir, # Pass the debug directory
+        'denoise_b',
+        debug_log_dir,
         device
     )
     app_models['denoise_16'] = _load_single_model(
         uformer_16_denoise,
         os.path.join(base_path, 'uformer16_denoising_sidd.pth'),
-        'denoise_16', # Model key for debug file name
-        debug_log_dir, # Pass the debug directory
+        'denoise_16',
+        debug_log_dir,
+        device
+    )
+    app_models['deblur_b'] = _load_single_model(
+        uformer_b_deblur,
+        os.path.join(base_path, 'Uformer_B_GoPro.pth'),
+        'deblur_b', # New model key for debug file
+        debug_log_dir,
         device
     )
 

@@ -31,6 +31,18 @@
         .sidebar h2 { margin-top: 0; border-bottom: 1px solid #61dafb; padding-bottom: 10px; color: #61dafb; }
         .control-group { display: flex; flex-direction: column; gap: 10px; }
         .control-group label { font-weight: bold; font-size: 0.9rem; }
+        /* Highlight for Task Selection */
+        #taskControlGroup {
+            background-color: #31353c; /* A slightly lighter background than sidebar */
+            border: 1px solid #61dafb; /* Accent border color */
+            padding: 15px; /* Increase padding for visual separation */
+            border-radius: 8px; /* Match other rounded elements */
+            margin-bottom: 10px; /* Add some space below it */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Subtle shadow for depth */
+        }
+        #taskControlGroup label {
+            color: #61dafb; /* Make the label text match the accent color */
+        }
         .main-content { flex-grow: 1; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
         .actions-bar { display: flex; align-items: center; gap: 20px; background-color: #4a4f5a; padding: 15px; border-radius: 8px; flex-shrink: 0; }
         #processImageBtn { font-size: 1.1rem; padding: 10px 20px; cursor: pointer; border: none; border-radius: 5px; background-color: #61dafb; color: #20232a; font-weight: bold; transition: background-color 0.2s; }
@@ -77,11 +89,17 @@
     <div class="page-content">
         <div class="sidebar">
             <h2>Image Controls</h2>
+            <div class="control-group" id="taskControlGroup">
+                <label for="taskSelect">Task</label>
+                <select id="taskSelect" style="padding: 8px; font-size: 1rem; border-radius: 4px; border: 1px solid #61dafb; background-color: #4a4f5a; color: white;">
+                    <option value="denoise">Denoise</option>
+                    <option value="deblur">Deblur</option>
+                </select>
+            </div>
             <div class="control-group">
                 <label for="modelSelect">Enhancement Model</label>
                 <select id="modelSelect" style="padding: 8px; font-size: 1rem; border-radius: 4px; border: 1px solid #61dafb; background-color: #4a4f5a; color: white;">
-                    <option value="denoise_b">Uformer-B (High Quality)</option>
-                    <option value="denoise_16" selected>Uformer-16 (Fast)</option>
+                    <!-- Options will be dynamically populated by JavaScript -->
                 </select>
             </div>
             <div class="control-group checkbox-group">
@@ -131,6 +149,7 @@
         const processImageBtn = document.getElementById('processImageBtn');
         const downloadBtn = document.getElementById('downloadBtn');
         const statusSpan = document.getElementById('status');
+        const taskSelect = document.getElementById('taskSelect');
         const modelSelect = document.getElementById('modelSelect');
         const patchCheckbox = document.getElementById('patchCheckbox');
         // --- Cache Management ---
@@ -172,6 +191,7 @@
 
             const formData = new FormData();
             formData.append("image_file", selectedImageFile);
+            formData.append("task_type", taskSelect.value); // Add task type
             formData.append("model_name", modelSelect.value);
             formData.append("use_patch_processing", patchCheckbox.checked);
 
@@ -311,10 +331,48 @@
             }
         };
 
+        // --- Model and Task Management ---
+        const modelsByTask = {
+            denoise: [
+                { value: 'denoise_b', text: 'Uformer-B (High Quality)' },
+                { value: 'denoise_16', text: 'Uformer-16 (Fast)' }
+            ],
+            deblur: [
+                { value: 'deblur_b', text: 'Uformer-B (Deblur)' }
+            ]
+        };
+
+        function populateModelSelect(taskType) {
+            modelSelect.innerHTML = ''; // Clear existing options
+            const models = modelsByTask[taskType];
+            if (models) {
+                models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model.value;
+                    option.textContent = model.text;
+                    
+                    // Set 'Uformer-16 (Fast)' as default for 'denoise' task, or select the only option available
+                    if (taskType === 'denoise' && model.value === 'denoise_16') {
+                        option.selected = true;
+                    } else if (models.length === 1) { // If there's only one model for a task, select it
+                        option.selected = true;
+                    }
+
+                    modelSelect.appendChild(option);
+                });
+            }
+        }
+
+        // Event listener for task selection change
+        taskSelect.addEventListener('change', (event) => {
+            populateModelSelect(event.target.value);
+        });
+
         // Initial load
         document.addEventListener('DOMContentLoaded', () => {
             updateCacheStatus();
             toggleClearButtonState(); // Set initial button state on page load
+            populateModelSelect(taskSelect.value); // Populate models based on initial task selection
         });
     </script>
 </body>
