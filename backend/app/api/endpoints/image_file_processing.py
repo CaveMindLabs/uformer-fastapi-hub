@@ -73,29 +73,26 @@ async def generate_preview(image_file: UploadFile = File(...)):
 @router.post("/api/process_image")
 async def process_image(
     image_file: UploadFile = File(...),
-    use_patch_processing: bool = Form(True), # The new toggle switch
+    use_patch_processing: bool = Form(True),
     models: Dict[str, Any] = Depends(get_uformer_model)
 ):
     """
     Accepts an image file, processes it using the Uformer model, and returns the enhanced image.
-    Supports standard image formats and Sony .ARW RAW files.
-    Allows toggling between patch-based (high quality) and resize (high speed) processing.
+    This pipeline now correctly handles RAW files by first developing them into a standard
+    sRGB format that matches the model's training data.
     """
     uformer_model = models["uformer_model"]
     device = models["device"]
     patch_size = 256
 
     if uformer_model is None:
-        raise HTTPException(status_code=503, detail="Uformer model is not loaded or failed to initialize.")
+        raise HTTPException(status_code=503, detail="Uformer model is not loaded.")
 
     try:
-        print(f"--- [IMAGE_PROCESSOR] New Job ---")
-        print(f"[IMAGE_PROCESSOR] Processing image: {image_file.filename}")
-        print(f"[IMAGE_PROCESSOR] Patch processing enabled: {use_patch_processing}")
-        
+        print(f"--- [IMAGE_PROCESSOR] New Job for: {image_file.filename} ---")
         contents = await image_file.read()
-        
-        # --- Save the original uploaded file, REGARDLESS of type ---
+
+        # --- Save the original uploaded file ---
         unique_id = f"{int(time.time())}_{uuid.uuid4().hex[:8]}"
         image_upload_dir = os.path.join("temp", "images", "uploads")
         os.makedirs(image_upload_dir, exist_ok=True)
@@ -103,104 +100,68 @@ async def process_image(
         original_filepath = os.path.join(image_upload_dir, original_filename)
         with open(original_filepath, "wb") as f:
             f.write(contents)
-        print(f"[IMAGE_PROCESSOR] Saved original full-res image to: {original_filepath}")
+        print(f"[IMAGE_PROCESSOR] Saved original file to: {original_filepath}")
 
-        # --- Handle different image types (.ARW vs standard) ---
-        if image_file.filename.lower().endswith('.arw'):
-            print("[IMAGE_PROCESSOR] Detected .ARW RAW file.")
+        # --- Step 1: Prepare the input image into a standard NumPy array ---
+        # This input_np is what we will process. It will be 8-bit sRGB.
+        if image_file.filename.lower().endswith(('.arw', '.nef', '.cr2', '.dng')):
+            print("[IMAGE_PROCESSOR] RAW file detected. Developing to sRGB...")
             with rawpy.imread(io.BytesIO(contents)) as raw:
-                # Post-process to get a linear 16-bit RGB image
-                rgb_16bit = raw.postprocess(gamma=(1, 1), no_auto_bright=True, output_bps=16)
-            
-            # --- CRITICAL FIX: Mimic the SIDD training pipeline ---
-            # 1. Normalize from [0, 65535] to float[0, 1]
-            input_linear_np = (rgb_16bit / 65535.0).astype(np.float32)
-            
-            # 2. Amplify the brightness. The ratio is a hyperparameter; 100-300 are common.
-            #    We are making the dark input brighter before feeding it to the model.
-            amplification_ratio = 200.0 
-            print(f"[IMAGE_PROCESSOR] Amplifying RAW image by ratio: {amplification_ratio}")
-            input_full_res_np = np.clip(input_linear_np * amplification_ratio, 0.0, 1.0)
+                # Develop the RAW file into a standard, viewable 8-bit sRGB image.
+                # This mimics the format of the SIDD sRGB training dataset.
+                input_np_8bit = raw.postprocess(use_camera_wb=True, output_color=rawpy.ColorSpace.sRGB, output_bps=8)
         else:
-            print("[IMAGE_PROCESSOR] Detected standard image file (JPG/PNG).")
-            image_pil = Image.open(io.BytesIO(contents)).convert("RGB")
-            # Convert to float and normalize to [0,1]
-            input_full_res_np = (np.array(image_pil) / 255.0).astype(np.float32)
-
-        # --- SAVE THE PRE-PROCESSED/AMPLIFIED INPUT THAT THE MODEL WILL SEE ---
-        amplified_dir = os.path.join("temp", "images", "amplified_inputs")
-        os.makedirs(amplified_dir, exist_ok=True)
-        # Create a saveable uint8 version of the float array
-        amplified_image_to_save = (input_full_res_np * 255.0).astype(np.uint8)
+            print("[IMAGE_PROCESSOR] Standard image file detected.")
+            input_np_8bit = np.array(Image.open(io.BytesIO(contents)).convert("RGB"))
         
-        # Robustly get the filename base and force a .jpg extension
-        amplified_filename_base = os.path.splitext(image_file.filename)[0]
-        amplified_filename = f"{unique_id}_amplified_{amplified_filename_base}.jpg"
-        
-        amplified_filepath = os.path.join(amplified_dir, amplified_filename)
-        Image.fromarray(amplified_image_to_save).save(amplified_filepath)
-        print(f"[IMAGE_PROCESSOR] Saved amplified input image to: {amplified_filepath}")
+        # --- Save the "developed" input that the model will see ---
+        developed_dir = os.path.join("temp", "images", "developed_inputs")
+        os.makedirs(developed_dir, exist_ok=True)
+        developed_filename_base = os.path.splitext(image_file.filename)[0]
+        developed_filename = f"{unique_id}_developed_{developed_filename_base}.jpg"
+        Image.fromarray(input_np_8bit).save(os.path.join(developed_dir, developed_filename))
+        print(f"[IMAGE_PROCESSOR] Saved developed input to: {os.path.join(developed_dir, developed_filename)}")
 
+        # --- Step 2: Normalize the 8-bit image to float[0,1] for the model ---
+        input_full_res_np = (input_np_8bit / 255.0).astype(np.float32)
         original_h, original_w, _ = input_full_res_np.shape
-        print(f"[IMAGE_PROCESSOR] Original dimensions: {original_w}x{original_h}")
-
+        
+        # --- Step 3: Process the image (patch or resize) ---
         final_enhanced_image_np = None
-
-        # --- Toggleable Processing Logic ---
         if use_patch_processing:
-            # --- HIGH QUALITY (SLOW) - PATCH-BASED PIPELINE ---
-            print("[IMAGE_PROCESSOR] Using high-quality patch-based pipeline.")
             padded_input_np, _ = pad_image_to_multiple(input_full_res_np, patch_size)
             padded_h, padded_w, _ = padded_input_np.shape
             padded_output_np = np.zeros_like(padded_input_np)
-            
-            # total_patches = (padded_h // patch_size) * (padded_w // patch_size)
-            for i, y in enumerate(range(0, padded_h, patch_size)):
-                for j, x in enumerate(range(0, padded_w, patch_size)):
+            for y in range(0, padded_h, patch_size):
+                for x in range(0, padded_w, patch_size):
                     patch_np = padded_input_np[y:y+patch_size, x:x+patch_size, :]
                     patch_tensor = torch.from_numpy(patch_np).permute(2, 0, 1).unsqueeze(0).to(device)
-                    
                     with torch.no_grad():
                         restored_patch_tensor = uformer_model(patch_tensor)
-                    
                     restored_patch_np = restored_patch_tensor.squeeze(0).permute(1, 2, 0).clamp(0.0, 1.0).cpu().numpy()
                     padded_output_np[y:y+patch_size, x:x+patch_size, :] = restored_patch_np
-            
             final_enhanced_image_np = padded_output_np[0:original_h, 0:original_w, :]
-
         else:
-            # --- HIGH SPEED (LOW QUALITY) - RESIZE PIPELINE ---
-            print("[IMAGE_PROCESSOR] Using high-speed resize pipeline.")
             resized_input_np = cv2.resize(input_full_res_np, (patch_size, patch_size), interpolation=cv2.INTER_LANCZOS4)
             input_tensor = torch.from_numpy(resized_input_np).permute(2, 0, 1).unsqueeze(0).to(device)
-            
             with torch.no_grad():
                 restored_tensor = uformer_model(input_tensor)
-
             restored_resized_np = restored_tensor.squeeze(0).permute(1, 2, 0).clamp(0.0, 1.0).cpu().numpy()
-            
-            # Upscale back to original dimensions as requested
             final_enhanced_image_np = cv2.resize(restored_resized_np, (original_w, original_h), interpolation=cv2.INTER_LANCZOS4)
 
-        print("[IMAGE_PROCESSOR] All processing complete. Preparing response.")
-
-        # Convert final float[0,1] numpy array to uint8[0,255] for saving
+        # --- Step 4: Prepare and save the final output ---
         output_image_uint8 = (final_enhanced_image_np * 255.0).astype(np.uint8)
         pil_output_image = Image.fromarray(output_image_uint8)
-        
         img_byte_arr = io.BytesIO()
         pil_output_image.save(img_byte_arr, format='JPEG', quality=95)
         
-        # --- Save final processed file for debugging ---
-        unique_id = f"{int(time.time())}_{uuid.uuid4().hex[:8]}"
         image_processed_dir = os.path.join("temp", "images", "processed")
         os.makedirs(image_processed_dir, exist_ok=True)
         processed_filename_base = os.path.splitext(image_file.filename)[0]
         processed_filename = f"{unique_id}_processed_{processed_filename_base}.jpg"
-        processed_filepath = os.path.join(image_processed_dir, processed_filename)
-        with open(processed_filepath, "wb") as f:
+        with open(os.path.join(image_processed_dir, processed_filename), "wb") as f:
             f.write(img_byte_arr.getvalue())
-        print(f"[IMAGE_PROCESSOR] Saved processed image to: {processed_filepath}")
+        print(f"[IMAGE_PROCESSOR] Saved processed image to: {os.path.join(image_processed_dir, processed_filename)}")
 
         img_byte_arr.seek(0)
         return Response(content=img_byte_arr.getvalue(), media_type="image/jpeg")
@@ -209,4 +170,4 @@ async def process_image(
         print(f"[IMAGE_PROCESSOR] ERROR: Failed to process image: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to process image: {e}")
-    
+ 
