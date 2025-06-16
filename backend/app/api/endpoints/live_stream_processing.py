@@ -10,8 +10,8 @@ import cv2
 import numpy as np
 from PIL import Image
 
-# Import the dependency to get our loaded Uformer model
-from app.api.dependencies import get_uformer_model
+# Import the dependency to get our loaded models
+from app.api.dependencies import get_models
 
 router = APIRouter()
 
@@ -35,12 +35,11 @@ def pad_image_to_multiple(image_np: np.ndarray, multiple: int, mode='reflect') -
 @router.websocket("/ws/process_video")
 async def websocket_process_video(
     websocket: WebSocket,
-    models: Dict[str, Any] = Depends(get_uformer_model)
+    models: Dict[str, Any] = Depends(get_models)
 ):
     await websocket.accept()
     print("[WS-BACKEND] ==> WebSocket connection accepted.")
 
-    uformer_model = models["uformer_model"]
     device = models["device"]
     patch_size = 256
     
@@ -50,8 +49,18 @@ async def websocket_process_video(
         while True:
             data = await websocket.receive_json()
             image_b64 = data["image_b64"]
+            
+            # Get processing options from the client
+            model_name = data.get("model_name", "denoise_b") # Default to high-quality model
             show_fps = data.get("show_fps", False)
-            use_patch_processing = data.get("use_patch_processing", False) # Default to fast resize for live
+            use_patch_processing = data.get("use_patch_processing", False)
+
+            # Select the model based on the name received
+            if model_name not in models:
+                # Handle invalid model name gracefully in WebSocket
+                await websocket.send_json({"error": f"Invalid model name: {model_name}"})
+                continue
+            uformer_model = models[model_name]
 
             img_bytes = base64.b64decode(image_b64.split(',')[1])
             image_pil = Image.open(io.BytesIO(img_bytes)).convert("RGB")

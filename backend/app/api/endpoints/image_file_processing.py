@@ -1,7 +1,7 @@
 # noctura-uformer/backend/app/api/endpoints/image_file_processing.py
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from fastapi.responses import Response
-from PIL import Image, ImageOps
+from PIL import Image
 from typing import Dict, Any, Tuple
 import io
 import torch
@@ -14,8 +14,8 @@ import uuid
 import traceback
 import rawpy
 
-# Import the dependency to get our loaded Uformer model
-from app.api.dependencies import get_uformer_model
+# Import the dependency to get our loaded models
+from app.api.dependencies import get_models
 
 router = APIRouter()
 
@@ -73,20 +73,21 @@ async def generate_preview(image_file: UploadFile = File(...)):
 @router.post("/api/process_image")
 async def process_image(
     image_file: UploadFile = File(...),
+    model_name: str = Form("denoise_b"),
     use_patch_processing: bool = Form(True),
-    models: Dict[str, Any] = Depends(get_uformer_model)
+    models: Dict[str, Any] = Depends(get_models)
 ):
     """
-    Accepts an image file, processes it using the Uformer model, and returns the enhanced image.
+    Accepts an image file, processes it using the selected Uformer model, and returns the enhanced image.
     This pipeline now correctly handles RAW files by first developing them into a standard
     sRGB format that matches the model's training data.
     """
-    uformer_model = models["uformer_model"]
+    if model_name not in models:
+        raise HTTPException(status_code=400, detail=f"Invalid model name: {model_name}. Available models: {[k for k in models if k != 'device']}")
+    
+    uformer_model = models[model_name]
     device = models["device"]
     patch_size = 256
-
-    if uformer_model is None:
-        raise HTTPException(status_code=503, detail="Uformer model is not loaded.")
 
     try:
         print(f"--- [IMAGE_PROCESSOR] New Job for: {image_file.filename} ---")

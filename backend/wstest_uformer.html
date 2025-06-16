@@ -56,8 +56,11 @@
         <div class="sidebar">
             <h2>Live Controls</h2>
             <div class="control-group">
-                <label>Enhancement Model</label>
-                <p style="padding: 8px; background-color: #4a4f5a; border-radius: 4px; margin: 0;">Uformer (SIDD Pre-trained)</p>
+                <label for="modelSelect">Enhancement Model</label>
+                <select id="modelSelect" style="padding: 8px; font-size: 1rem; border-radius: 4px; border: 1px solid #61dafb; background-color: #4a4f5a; color: white;">
+                    <option value="denoise_b">Uformer-B (High Quality)</option>
+                    <option value="denoise_16">Uformer-16 (Fast)</option>
+                </select>
             </div>
             <div class="control-group checkbox-group">
                 <label><input type="checkbox" id="fpsCheckbox" checked> Show FPS Counter</label>
@@ -94,6 +97,7 @@
         const webcamVideo = document.getElementById('webcam');
         const processedImage = document.getElementById('processedImage');
         const statusSpan = document.getElementById('status');
+        const modelSelect = document.getElementById('modelSelect');
         const fpsCheckbox = document.getElementById('fpsCheckbox');
         const patchCheckbox = document.getElementById('patchCheckbox');
         const patchWarning = document.getElementById('patchWarning');
@@ -176,6 +180,7 @@
 
             const payload = {
                 image_b64: dataUrl,
+                model_name: modelSelect.value,
                 show_fps: fpsCheckbox.checked,
                 use_patch_processing: patchCheckbox.checked
             };

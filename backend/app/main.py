@@ -6,8 +6,8 @@ import os
 import torch
 
 # Import the model loading dependency AND the app_models dictionary
-from app.api.dependencies import load_uformer_model, app_models
-from app.api.endpoints import image_file_processing, video_file_processing, live_stream_processing
+from app.api.dependencies import load_models, app_models
+from app.api.endpoints import image_file_processing, video_file_processing, live_stream_processing, cache_management
 
 
 # Using asynccontextmanager to manage application startup/shutdown events
@@ -15,35 +15,31 @@ from app.api.endpoints import image_file_processing, video_file_processing, live
 async def lifespan(app: FastAPI):
     """
     FastAPI application startup and shutdown events.
-    Loads the Uformer model into memory on startup.
+    Loads all Uformer models into memory on startup.
     """
     print("FastAPI application startup...")
     
-    # Determine device: CUDA if available, else CPU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
+    app_models["device"] = device # Store device in shared state
 
-    # Load the Uformer model
-    model_path = os.path.join(os.path.dirname(__file__), '../model_weights/official_pretrained/Uformer_B_SIDD.pth')
-    
     try:
-        uformer_model = await load_uformer_model(model_path, device)
-        app_models["uformer_model"] = uformer_model
-        app_models["device"] = device
-        print("Uformer model loaded successfully.")
+        await load_models(device)
+        print(f"All models loaded successfully. Available: {list(k for k in app_models.keys() if k != 'device')}")
     except Exception as e:
-        print(f"ERROR: Failed to load Uformer model: {e}")
-        app_models["uformer_model"] = None # Indicate failure
-        app_models["device"] = device # Still set device even if model fails
+        print(f"FATAL ERROR: Failed to load one or more Uformer models: {e}")
+        # Clear any partially loaded models to indicate a failed state
+        for key in list(app_models.keys()):
+            if key != 'device':
+                del app_models[key]
 
     yield # Application is running
 
     print("FastAPI application shutdown...")
-    # Any cleanup code (e.g., releasing GPU memory if explicit handles were used) can go here
-    if "uformer_model" in app_models and app_models["uformer_model"] is not None:
-        del app_models["uformer_model"] # Explicitly release model
+    if app_models:
+        app_models.clear()
         if device.type == 'cuda':
-            torch.cuda.empty_cache() # Clear CUDA cache
+            torch.cuda.empty_cache()
             print("CUDA cache cleared.")
     print("FastAPI application shutdown complete.")
 
@@ -70,14 +66,17 @@ app.add_middleware(
 app.include_router(live_stream_processing.router, tags=["live_stream_processing"])
 app.include_router(video_file_processing.router, tags=["video_file_processing"])
 app.include_router(image_file_processing.router, tags=["image_file_processing"])
+app.include_router(cache_management.router, tags=["cache_management"])
+
 
 @app.get("/health", tags=["healthcheck"])
 async def health_check():
     """Simple health check endpoint."""
-    if "uformer_model" in app_models and app_models["uformer_model"] is not None:
-        return {"status": "ok", "model_loaded": True, "device": str(app_models["device"])}
+    loaded_models = [k for k in app_models.keys() if k != 'device']
+    if loaded_models:
+        return {"status": "ok", "models_loaded": True, "models_available": loaded_models, "device": str(app_models.get("device"))}
     else:
-        return {"status": "error", "model_loaded": False, "detail": "Uformer model failed to load.", "device": str(app_models.get("device", "N/A"))}
+        return {"status": "error", "models_loaded": False, "detail": "Uformer models failed to load.", "device": str(app_models.get("device", "N/A"))}
 
 @app.get("/")
 async def read_root():

@@ -13,13 +13,15 @@ FILES_TO_EXTRACT = [
     # --- Project Setup ---
     "Pipfile",
     "_useful_commands.md",
+    "README.md", # Add README for the final documentation phase
 
     # --- FastAPI Backend Application ---
     "backend/app/main.py",
     "backend/app/api/dependencies.py",
-    "backend/app/api/endpoints/video_processing.py",
-    "backend/app/api/endpoints/file_processing.py",
-    "backend/app/api/endpoints/image_processing.py",
+    "backend/app/api/endpoints/image_file_processing.py",
+    "backend/app/api/endpoints/video_file_processing.py",
+    "backend/app/api/endpoints/live_stream_processing.py",
+    "backend/app/api/endpoints/cache_management.py", # New file to be created
 
 
     # --- Core Uformer Model Code (for inference) ---

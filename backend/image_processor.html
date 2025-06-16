@@ -55,8 +55,11 @@
         <div class="sidebar">
             <h2>Image Controls</h2>
             <div class="control-group">
-                <label>Enhancement Model</label>
-                <p style="padding: 8px; background-color: #4a4f5a; border-radius: 4px; margin: 0;">Uformer (SIDD Pre-trained)</p>
+                <label for="modelSelect">Enhancement Model</label>
+                <select id="modelSelect" style="padding: 8px; font-size: 1rem; border-radius: 4px; border: 1px solid #61dafb; background-color: #4a4f5a; color: white;">
+                    <option value="denoise_b">Uformer-B (High Quality)</option>
+                    <option value="denoise_16">Uformer-16 (Fast)</option>
+                </select>
             </div>
             <div class="control-group checkbox-group">
                 <label><input type="checkbox" id="patchCheckbox" checked> Use Patch Processing (High Quality)</label>
@@ -105,6 +108,7 @@
         const processImageBtn = document.getElementById('processImageBtn');
         const downloadBtn = document.getElementById('downloadBtn');
         const statusSpan = document.getElementById('status');
+        const modelSelect = document.getElementById('modelSelect');
         const patchCheckbox = document.getElementById('patchCheckbox');
 
         let selectedImageFile = null;
@@ -139,6 +143,7 @@
 
             const formData = new FormData();
             formData.append("image_file", selectedImageFile);
+            formData.append("model_name", modelSelect.value);
             formData.append("use_patch_processing", patchCheckbox.checked);
 
             try {

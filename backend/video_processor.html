@@ -53,10 +53,13 @@
     </header>
     <div class="page-content">
         <div class="sidebar">
-            <h2>Video Controls</h2>
+            <h2>Video Controls</h2>      
             <div class="control-group">
-                <label>Enhancement Model</label>
-                <p style="padding: 8px; background-color: #4a4f5a; border-radius: 4px; margin: 0;">Uformer (SIDD Pre-trained)</p>
+                <label for="modelSelect">Enhancement Model</label>
+                <select id="modelSelect" style="padding: 8px; font-size: 1rem; border-radius: 4px; border: 1px solid #61dafb; background-color: #4a4f5a; color: white;">
+                    <option value="denoise_b">Uformer-B (High Quality)</option>
+                    <option value="denoise_16">Uformer-16 (Fast)</option>
+                </select>
             </div>
             <div class="control-group">
                 <p style="font-size: 0.9rem; color: #ccc;">Note: Video file processing always uses the high-quality patch-based pipeline.</p>
@@ -106,6 +109,7 @@
         const stopProcessingBtn = document.getElementById('stopProcessingBtn');
         const downloadBtn = document.getElementById('downloadBtn');
         const statusSpan = document.getElementById('status');
+        const modelSelect = document.getElementById('modelSelect');
 
         let selectedVideoFile = null;
         let pollingInterval = null; // To hold the interval ID for polling
@@ -143,6 +147,7 @@
 
             const formData = new FormData();
             formData.append("video_file", selectedVideoFile);
+            formData.append("model_name", modelSelect.value);
 
             try {
                 const response = await fetch('http://127.0.0.1:8000/api/process_video', { 

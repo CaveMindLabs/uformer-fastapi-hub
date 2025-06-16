@@ -1,5 +1,5 @@
 # noctura-uformer/backend/app/api/endpoints/video_file_processing.py
-from fastapi import APIRouter, UploadFile, File, BackgroundTasks, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, Form, BackgroundTasks, HTTPException, Depends
 from fastapi.responses import JSONResponse, FileResponse
 from typing import Dict, Any, Tuple
 import uuid
@@ -12,8 +12,8 @@ import ffmpeg
 import traceback
 from tqdm import tqdm
 
-# Import shared model from dependencies
-from app.api.dependencies import get_uformer_model
+# Import shared models from dependencies
+from app.api.dependencies import get_models
 
 router = APIRouter()
 
@@ -37,20 +37,20 @@ def pad_image_to_multiple(image_np: np.ndarray, multiple: int, mode='reflect') -
     padded_image = np.pad(image_np, ((0, pad_h), (0, pad_w), (0, 0)), mode=mode)
     return padded_image, (original_h, original_w)
 
-def video_processing_task(task_id: str, input_path: str, output_path: str, models: Dict[str, Any]):
+def video_processing_task(task_id: str, input_path: str, output_path: str, model_name: str, models: Dict[str, Any]):
     """
-    Processes a video frame-by-frame using a patch-based approach with the Uformer model.
+    Processes a video frame-by-frame using a patch-based approach with the selected Uformer model.
     """
     tasks[task_id]['status'] = 'processing'
-    print(f"[VIDEO_PROCESSOR] Task {task_id}: Starting REAL processing for {input_path}")
+    print(f"[VIDEO_PROCESSOR] Task {task_id}: Starting processing for {input_path} with model '{model_name}'")
 
     try:
-        uformer_model = models["uformer_model"]
+        if model_name not in models:
+            raise RuntimeError(f"Invalid model name provided to task: {model_name}")
+            
+        uformer_model = models[model_name]
         device = models["device"]
         patch_size = 256
-        
-        if uformer_model is None:
-            raise RuntimeError("Uformer model is not loaded.")
 
         # 1. Open video and get properties
         cap = cv2.VideoCapture(input_path)
@@ -126,7 +126,8 @@ def video_processing_task(task_id: str, input_path: str, output_path: str, model
 async def process_video(
     background_tasks: BackgroundTasks,
     video_file: UploadFile = File(...),
-    models: Dict[str, Any] = Depends(get_uformer_model)
+    model_name: str = Form("denoise_b"),
+    models: Dict[str, Any] = Depends(get_models)
 ):
     video_upload_dir = os.path.join("temp", "videos", "uploads")
     video_output_dir = os.path.join("temp", "videos", "processed")
@@ -145,7 +146,8 @@ async def process_video(
 
     tasks[task_id] = {"status": "pending", "filename": sanitized_filename, "result_path": None, "error": None}
     
-    background_tasks.add_task(video_processing_task, task_id, input_path, output_path, models)
+    # Pass the selected model_name to the background task
+    background_tasks.add_task(video_processing_task, task_id, input_path, output_path, model_name, models)
     
     return JSONResponse(status_code=202, content={"task_id": task_id, "message": "Video upload successful, processing started."})
 
