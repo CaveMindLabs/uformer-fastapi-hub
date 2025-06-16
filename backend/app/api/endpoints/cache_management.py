@@ -61,17 +61,30 @@ async def get_cache_status():
 
 
 @router.post("/api/clear_cache", tags=["cache_management"])
-async def clear_cache():
-    """Clears all content from the temporary image and video directories."""
+async def clear_cache(clear_images: bool = True, clear_videos: bool = True):
+    """
+    Clears content from the temporary image and/or video directories based on flags.
+    """
+    if not clear_images and not clear_videos:
+        return JSONResponse(
+            status_code=400,
+            content={"message": "No action taken. Please select at least one cache to clear."}
+        )
     try:
-        clear_dir_content(TEMP_DIRS["images"])
-        clear_dir_content(TEMP_DIRS["videos"])
+        if clear_images:
+            clear_dir_content(TEMP_DIRS["images"])
+        if clear_videos:
+            clear_dir_content(TEMP_DIRS["videos"])
+            
+        cleared = []
+        if clear_images: cleared.append("image")
+        if clear_videos: cleared.append("video")
+        
         return JSONResponse(
             status_code=200, 
-            content={"message": "Cache cleared successfully."}
+            content={"message": f"Successfully cleared { ' and '.join(cleared) } cache."}
         )
     except Exception as e:
         print(f"Error clearing cache: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to clear cache: {e}")
-    

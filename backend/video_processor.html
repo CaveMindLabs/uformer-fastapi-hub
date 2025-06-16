@@ -6,6 +6,8 @@
     <title>NocturaVision - Video File Processor</title>
     <style>
         html, body { height: 100vh; margin: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #282c34; color: white; display: flex; flex-direction: column; }
+
+        /* --- Consistent Header --- */
         header { background-color: #20232a; padding: 15px 30px; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; }
         .nav-bar { display: flex; gap: 15px; }
         .nav-button { padding: 8px 15px; border: 1px solid #61dafb; color: #61dafb; background-color: transparent; text-decoration: none; border-radius: 5px; cursor: pointer; font-size: 1rem; transition: background-color 0.2s, color 0.2s; }
@@ -14,7 +16,16 @@
         .title-block { text-align: center; }
         .title-block h1 { margin: 0 0 5px 0; font-size: 2.2rem; }
         .title-block p { margin: 0; font-size: 1rem; color: #ccc; }
-        .placeholder { width: 235px; }
+        .cache-info-block { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; width: 235px; /* Match nav-bar width */ }
+        .cache-line { display: flex; align-items: center; width: 100%; gap: 8px; font-size: 0.9rem; cursor: pointer; }
+        .cache-line input[type="checkbox"] { flex-shrink: 0; }
+        .cache-label-text { flex-grow: 1; text-align: left; color: #ccc; }
+        .cache-value { font-weight: bold; min-width: 70px; text-align: right; color: white; }
+        #clearCacheBtn { margin-top: 5px; padding: 6px 12px; font-size: 0.9rem; background-color: #ff6b6b; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        #clearCacheBtn:hover:not(:disabled) { background-color: #e05252; } /* Only hover if not disabled */
+        #clearCacheBtn:disabled { background-color: #555; color: #888; cursor: not-allowed; } /* Style for disabled state */
+
+        /* --- Page-Specific Content --- */
         .page-content { display: flex; flex-grow: 1; padding: 20px; gap: 20px; box-sizing: border-box; min-height: 0; }
         .sidebar { flex: 0 0 350px; background-color: #3c4049; padding: 20px; border-radius: 8px; display: flex; flex-direction: column; gap: 25px; overflow-y: auto; }
         .sidebar h2 { margin-top: 0; border-bottom: 1px solid #61dafb; padding-bottom: 10px; color: #61dafb; }
@@ -49,7 +60,19 @@
             <h1>🦉 NocturaVision <span style="font-weight: 300; color: #ccc;">| Uformer</span></h1>
             <p>Video File Enhancement</p>
         </div>
-        <div class="placeholder"></div>
+        <div class="cache-info-block">
+            <label class="cache-line">
+                <input type="checkbox" id="clearImagesCheck" unchecked>
+                <span class="cache-label-text">Image Cache:</span>
+                <span class="cache-value" id="imageCacheValue">... MB</span>
+            </label>
+            <label class="cache-line">
+                <input type="checkbox" id="clearVideosCheck" checked>
+                <span class="cache-label-text">Video Cache:</span>
+                <span class="cache-value" id="videoCacheValue">... MB</span>
+            </label>
+            <button id="clearCacheBtn">Clear Selected</button>
+        </div>
     </header>
     <div class="page-content">
         <div class="sidebar">
@@ -58,7 +81,7 @@
                 <label for="modelSelect">Enhancement Model</label>
                 <select id="modelSelect" style="padding: 8px; font-size: 1rem; border-radius: 4px; border: 1px solid #61dafb; background-color: #4a4f5a; color: white;">
                     <option value="denoise_b">Uformer-B (High Quality)</option>
-                    <option value="denoise_16">Uformer-16 (Fast)</option>
+                    <option value="denoise_16" selected>Uformer-16 (Fast)</option>
                 </select>
             </div>
             <div class="control-group">
@@ -110,6 +133,12 @@
         const downloadBtn = document.getElementById('downloadBtn');
         const statusSpan = document.getElementById('status');
         const modelSelect = document.getElementById('modelSelect');
+        // --- Cache Management ---
+        const clearCacheBtn = document.getElementById('clearCacheBtn');
+        const clearImagesCheck = document.getElementById('clearImagesCheck');
+        const clearVideosCheck = document.getElementById('clearVideosCheck');
+        const imageCacheValue = document.getElementById('imageCacheValue');
+        const videoCacheValue = document.getElementById('videoCacheValue');
 
         let selectedVideoFile = null;
         let pollingInterval = null; // To hold the interval ID for polling
@@ -267,7 +296,66 @@
             }
         }
 
-        document.addEventListener('DOMContentLoaded', () => {});
+        // --- Cache Management ---
+        async function updateCacheStatus() {
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/cache_status');
+                if (!response.ok) throw new Error("Server status check failed");
+                const data = await response.json();
+                imageCacheValue.textContent = `${data.image_cache_mb} MB`;
+                videoCacheValue.textContent = `${data.video_cache_mb} MB`;
+            } catch (error) {
+                console.error("Failed to fetch cache status:", error);
+                imageCacheValue.textContent = `Error`;
+                videoCacheValue.textContent = `Error`;
+            }
+        }
+
+        function toggleClearButtonState() {
+            if (!clearImagesCheck.checked && !clearVideosCheck.checked) {
+                clearCacheBtn.disabled = true;
+            } else {
+                clearCacheBtn.disabled = false;
+            }
+        }
+        
+        clearImagesCheck.addEventListener('change', toggleClearButtonState);
+        clearVideosCheck.addEventListener('change', toggleClearButtonState);
+        
+        clearCacheBtn.onclick = async () => {
+            const clearImages = clearImagesCheck.checked;
+            const clearVideos = clearVideosCheck.checked;
+            
+            const confirmationMessage = `Are you sure you want to clear the selected cache(s)?`;
+            if (!confirm(confirmationMessage)) {
+                return;
+            }
+
+            try {
+                const url = new URL('http://127.0.0.1:8000/api/clear_cache');
+                url.searchParams.append('clear_images', clearImages);
+                url.searchParams.append('clear_videos', clearVideos);
+
+                const response = await fetch(url, { method: 'POST' });
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.detail || 'Failed to clear cache.');
+                }
+                
+                alert(result.message || 'Cache cleared successfully!');
+                await updateCacheStatus();
+            } catch (error) {
+                console.error("Cache clear error:", error);
+                alert(`An error occurred: ${error.message}`);
+            }
+        };
+
+        // Initial load
+        document.addEventListener('DOMContentLoaded', () => {
+            updateCacheStatus();
+            toggleClearButtonState(); // Set initial button state on page load
+        });
     </script>
 </body>
 </html>

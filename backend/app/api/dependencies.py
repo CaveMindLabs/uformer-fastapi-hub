@@ -21,7 +21,7 @@ def _load_single_model(model_definition: Uformer, model_path: str, device: torch
         
     new_state_dict = {k[7:] if k.startswith('module.') else k: v for k, v in state_dict_to_load.items()}
 
-    # --- START OF MODIFIED DEBUGGING CODE ---
+    # --- START OF DEBUGGING CODE ---
     # This will write the keys to a file in the `backend/` directory.
     debug_output_path = 'debug_keys.txt'
     try:
@@ -40,7 +40,7 @@ def _load_single_model(model_definition: Uformer, model_path: str, device: torch
 
     except Exception as e:
         print(f"--- DEBUG: FAILED TO WRITE DEBUG FILE: {e} ---")
-    # --- END OF MODIFIED DEBUGGING CODE ---
+    # --- END OF DEBUGGING CODE ---
 
     model_definition.load_state_dict(new_state_dict, strict=True)
     model_definition.to(device)

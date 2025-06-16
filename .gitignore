@@ -14,7 +14,8 @@ __pycache__/
 *.pyd
 
 # --- Generated & Temporary Files ---
-# Debugging outputs
+# Log files for model key debugging
+backend/logs/
 debug_keys.txt
 # Build artifacts
 /build/
