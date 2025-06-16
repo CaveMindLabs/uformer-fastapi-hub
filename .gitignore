@@ -31,6 +31,10 @@ debug_keys.txt
 ehthumbs.db
 Thumbs.db
 
+# Frontend
+/frontend/node_modules/
+/frontend/.next/
+
 # --- Large Files & Datasets ---
 # Exclude all model weights. Use Git LFS for this if you MUST track them.
 *.pth
@@ -40,7 +44,6 @@ Thumbs.db
 # Exclude all dataset directories
 datasets/
 Uformer/
-
 
 # Others
 backend/temp/

@@ -77,5 +77,20 @@ pipenv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --no-access-
     # Click the "Start Webcam" button.
 ~~~
 
+---
+# -> Frontend (Next.js):
+
+~~~bash
+# Navigate to the frontend directory (MUST be run from project root)
+cd frontend
+
+# Install dependencies for the first time
+npm install
+
+# Run the development server
+npm run dev
+
+# The frontend will be available at: http://localhost:3000
+~~~
 
 ---
