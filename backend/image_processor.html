@@ -167,6 +167,7 @@
                 downloadBtn.download = `enhanced_${selectedImageFile.name}`; // Set download filename
                 downloadBtn.classList.remove('hidden');
 
+                await updateCacheStatus(); // Update cache info after processing
                 statusSpan.textContent = "Image processing complete!";
 
             } catch (error) {

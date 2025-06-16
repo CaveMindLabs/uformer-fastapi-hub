@@ -214,6 +214,7 @@
 
                         resetUI();
                         stopProcessingBtn.disabled = true;
+                        updateCacheStatus(); // Update cache info after processing
 
                     } else if (data.status === 'failed') {
                         clearInterval(pollingInterval);

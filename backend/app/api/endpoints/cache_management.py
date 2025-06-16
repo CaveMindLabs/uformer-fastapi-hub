@@ -1,13 +1,77 @@
 # noctura-uformer/backend/app/api/endpoints/cache_management.py
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import JSONResponse
 import os
 import shutil
+import traceback
 
 router = APIRouter()
 
-# This is a placeholder for now.
-# We will implement the full functionality in Phase 2.2.
+TEMP_DIRS = {
+    "images": os.path.abspath(os.path.join("temp", "images")),
+    "videos": os.path.abspath(os.path.join("temp", "videos"))
+}
 
-@router.get("/api/cache_status_placeholder")
+def get_dir_size(path):
+    """Recursively calculates the size of a directory in bytes."""
+    total_size = 0
+    if not os.path.exists(path):
+        return 0
+    for dirpath, _, filenames in os.walk(path):
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            # skip if it is symbolic link
+            if not os.path.islink(fp):
+                total_size += os.path.getsize(fp)
+    return total_size
+
+def clear_dir_content(path):
+    """Deletes all files and subdirectories within a given path."""
+    if not os.path.exists(path):
+        os.makedirs(path) # Ensure dir exists even if we do nothing
+        return
+        
+    for item in os.listdir(path):
+        item_path = os.path.join(path, item)
+        try:
+            if os.path.isfile(item_path) or os.path.islink(item_path):
+                os.unlink(item_path)
+            elif os.path.isdir(item_path):
+                shutil.rmtree(item_path)
+        except Exception as e:
+            print(f"Failed to delete {item_path}. Reason: {e}")
+            # Raise an exception to be caught by the endpoint
+            raise e
+
+@router.get("/api/cache_status", tags=["cache_management"])
 async def get_cache_status():
-    return {"message": "Cache management endpoint is active."}
+    """Calculates and returns the size of the temporary image and video caches."""
+    try:
+        image_cache_size_bytes = get_dir_size(TEMP_DIRS["images"])
+        video_cache_size_bytes = get_dir_size(TEMP_DIRS["videos"])
+        
+        return {
+            "image_cache_mb": round(image_cache_size_bytes / (1024 * 1024), 2),
+            "video_cache_mb": round(video_cache_size_bytes / (1024 * 1024), 2)
+        }
+    except Exception as e:
+        print(f"Error getting cache status: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Failed to calculate cache size.")
+
+
+@router.post("/api/clear_cache", tags=["cache_management"])
+async def clear_cache():
+    """Clears all content from the temporary image and video directories."""
+    try:
+        clear_dir_content(TEMP_DIRS["images"])
+        clear_dir_content(TEMP_DIRS["videos"])
+        return JSONResponse(
+            status_code=200, 
+            content={"message": "Cache cleared successfully."}
+        )
+    except Exception as e:
+        print(f"Error clearing cache: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to clear cache: {e}")
+    

@@ -16,7 +16,10 @@
         .title-block { text-align: center; }
         .title-block h1 { margin: 0 0 5px 0; font-size: 2.2rem; }
         .title-block p { margin: 0; font-size: 1rem; color: #ccc; }
-        .placeholder { width: 235px; } /* Adjust this width to match nav-bar for perfect centering */
+        .cache-info-block { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; width: 235px; /* Match nav-bar width */ }
+        #cacheStatus { display: flex; flex-direction: column; font-size: 0.8rem; text-align: right; color: #ccc; }
+        #clearCacheBtn { padding: 6px 12px; font-size: 0.9rem; background-color: #ff6b6b; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        #clearCacheBtn:hover { background-color: #e05252; }
 
         /* --- Page-Specific Content --- */
         .page-content { display: flex; flex-grow: 1; padding: 20px; gap: 20px; box-sizing: border-box; min-height: 0; }
@@ -50,7 +53,13 @@
             <h1>🦉 NocturaVision <span style="font-weight: 300; color: #ccc;">| Uformer</span></h1>
             <p>Real-time Low-Light Enhancement</p>
         </div>
-        <div class="placeholder"></div> <!-- This is for alignment -->
+        <div class="cache-info-block">
+            <div id="cacheStatus">
+                <span>Image Cache: ... MB</span>
+                <span>Video Cache: ... MB</span>
+            </div>
+            <button id="clearCacheBtn">Clear Cache</button>
+        </div>
     </header>
     <div class="page-content">
         <div class="sidebar">
@@ -201,6 +210,42 @@
             stopButton.disabled = true;
             processedImage.src = "";
         }
+
+        // --- Cache Management ---
+        const cacheStatusDiv = document.getElementById('cacheStatus');
+        const clearCacheBtn = document.getElementById('clearCacheBtn');
+
+        async function updateCacheStatus() {
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/cache_status');
+                const data = await response.json();
+                cacheStatusDiv.innerHTML = `
+                    <span>Image Cache: ${data.image_cache_mb} MB</span>
+                    <span>Video Cache: ${data.video_cache_mb} MB</span>
+                `;
+            } catch (error) {
+                console.error("Failed to fetch cache status:", error);
+                cacheStatusDiv.innerHTML = `<span>Cache status unavailable</span>`;
+            }
+        }
+
+        clearCacheBtn.onclick = async () => {
+            if (!confirm("Are you sure you want to clear all temporary image and video files?")) {
+                return;
+            }
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/clear_cache', { method: 'POST' });
+                if (!response.ok) throw new Error('Failed to clear cache.');
+                alert('Cache cleared successfully!');
+                await updateCacheStatus();
+            } catch (error) {
+                console.error("Cache clear error:", error);
+                alert('An error occurred while clearing the cache.');
+            }
+        };
+
+        // Initial load
+        document.addEventListener('DOMContentLoaded', updateCacheStatus);
     </script>
 </body>
 </html>
