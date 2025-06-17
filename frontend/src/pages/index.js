@@ -1,13 +1,10 @@
 // frontend/src/pages/index.js
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 
-// NOTE: We are creating a functional component for each page.
-// The entire logic from the old <script> tag will be moved inside this component.
-
 const LiveStreamPage = () => {
-    // Refs are the React way to get direct access to a DOM element, like getElementById.
+    // --- Refs for direct DOM access ---
     const startButtonRef = useRef(null);
     const stopButtonRef = useRef(null);
     const webcamVideoRef = useRef(null);
@@ -23,17 +20,77 @@ const LiveStreamPage = () => {
     const clearVideosCheckRef = useRef(null);
     const imageCacheValueRef = useRef(null);
     const videoCacheValueRef = useRef(null);
-    const clearAllModelsBtnRef = useRef(null); // New ref for the Clear All Models button
-
-    // State variables to manage dynamic data and UI state.
+    
+    // --- State for React to manage UI ---
     const [isStreaming, setIsStreaming] = useState(false);
+    const [loadedModels, setLoadedModels] = useState([]); // Holds {name: string, loaded: boolean}
+    const [isVramControlVisible, setIsVramControlVisible] = useState(false);
+    const [selectedModelsToClear, setSelectedModelsToClear] = useState(new Set());
 
-    // This useEffect hook runs once when the component mounts, similar to DOMContentLoaded.
-    // All our old script logic goes in here.
+    // --- API and Business Logic (defined outside useEffect) ---
+
+    const updateLoadedModelsStatus = useCallback(async () => {
+        try {
+            const response = await fetch('http://127.0.0.1:8000/api/loaded_models_status');
+            if (!response.ok) throw new Error("Failed to fetch loaded models status.");
+            const data = await response.json();
+            setLoadedModels(data.models || []);
+
+            // Clear any selections for models that are no longer loaded
+            setSelectedModelsToClear(prev => {
+                const newSet = new Set(prev);
+                (data.models || []).forEach(model => {
+                    if (!model.loaded && newSet.has(model.name)) {
+                        newSet.delete(model.name);
+                    }
+                });
+                return newSet;
+            });
+
+        } catch (error) {
+            console.error("Failed to fetch loaded models status:", error);
+            setLoadedModels([]);
+        }
+    }, []);
+
+    const handleModelSelectionChange = (modelName) => {
+        setSelectedModelsToClear(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(modelName)) newSet.delete(modelName);
+            else newSet.add(modelName);
+            return newSet;
+        });
+    };
+    
+    const handleClearModels = useCallback(async (modelsToClear = []) => {
+        const isClearingAll = modelsToClear.length === 0;
+        const modelListStr = Array.from(modelsToClear).join(', ');
+        const confirmMsg = isClearingAll
+            ? "Are you sure you want to unload ALL models from VRAM? This may cause a delay on subsequent requests."
+            : `Are you sure you want to unload the selected models (${modelListStr}) from VRAM?`;
+
+        if (!confirm(confirmMsg)) return;
+
+        try {
+            const response = await fetch('http://127.0.0.1:8000/api/unload_models', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model_names: modelsToClear })
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.detail || 'Failed to unload models.');
+            alert(result.message || 'Models unloaded successfully!');
+            await updateLoadedModelsStatus();
+        } catch (error) {
+            alert(`An error occurred while unloading models: ${error.message}`);
+        }
+    }, [updateLoadedModelsStatus]);
+
+    // --- useEffect for component setup and teardown ---
     useEffect(() => {
         let websocket;
         let stream;
-        let localIsStreaming = false; // Use a local variable for the animation loop
+        let localIsStreaming = false;
         const WS_URL = "ws://127.0.0.1:8000/ws/process_video";
 
         const startButton = startButtonRef.current;
@@ -46,12 +103,17 @@ const LiveStreamPage = () => {
         const fpsCheckbox = fpsCheckboxRef.current;
         const patchCheckbox = patchCheckboxRef.current;
         const patchWarning = patchWarningRef.current;
+        const clearCacheBtn = clearCacheBtnRef.current;
+        const clearImagesCheck = clearImagesCheckRef.current;
+        const clearVideosCheck = clearVideosCheckRef.current;
+        const imageCacheValue = imageCacheValueRef.current;
+        const videoCacheValue = videoCacheValueRef.current;
 
         const stopStreaming = () => {
             localIsStreaming = false;
             setIsStreaming(false);
             if (websocket) {
-                websocket.onclose = null; 
+                websocket.onclose = null;
                 websocket.close();
             }
             if (stream) {
@@ -61,12 +123,11 @@ const LiveStreamPage = () => {
             if (startButton) startButton.disabled = false;
             if (stopButton) stopButton.disabled = true;
             if (processedImage) processedImage.src = "";
+            updateLoadedModelsStatus(); // Update model status on stream stop
         };
 
         const processAndSendFrame = () => {
-            if (!localIsStreaming || !websocket || websocket.readyState !== WebSocket.OPEN) {
-                return;
-            }
+            if (!localIsStreaming || !websocket || websocket.readyState !== WebSocket.OPEN) return;
             if (!webcamVideo || !webcamVideo.videoWidth || !webcamVideo.videoHeight) {
                 requestAnimationFrame(processAndSendFrame);
                 return;
@@ -83,11 +144,8 @@ const LiveStreamPage = () => {
             const dataUrl = canvas.toDataURL('image/jpeg');
 
             const payload = {
-                image_b64: dataUrl,
-                task_type: taskSelect.value,
-                model_name: modelSelect.value,
-                show_fps: fpsCheckbox.checked,
-                use_patch_processing: patchCheckbox.checked
+                image_b64: dataUrl, task_type: taskSelect.value, model_name: modelSelect.value,
+                show_fps: fpsCheckbox.checked, use_patch_processing: patchCheckbox.checked
             };
             websocket.send(JSON.stringify(payload));
         };
@@ -103,25 +161,19 @@ const LiveStreamPage = () => {
 
                 websocket.onopen = () => {
                     statusSpan.textContent = 'WebSocket Connected. Processing...';
-                    startButton.disabled = true;
-                    stopButton.disabled = false;
-                    localIsStreaming = true;
-                    setIsStreaming(true);
+                    startButton.disabled = true; stopButton.disabled = false;
+                    localIsStreaming = true; setIsStreaming(true);
                     requestAnimationFrame(processAndSendFrame); 
+                    updateLoadedModelsStatus();
                 };
-
                 websocket.onmessage = (event) => {
                     processedImage.src = event.data;
-                    if (localIsStreaming) {
-                        requestAnimationFrame(processAndSendFrame);
-                    }
+                    if (localIsStreaming) requestAnimationFrame(processAndSendFrame);
                 };
-
                 websocket.onclose = () => {
-                    if (localIsStreaming) { statusSpan.textContent = 'WebSocket Disconnected.'; }
+                    if (localIsStreaming) statusSpan.textContent = 'WebSocket Disconnected.';
                     stopStreaming();
                 };
-
                 websocket.onerror = (error) => {
                     statusSpan.classList.add('error');
                     statusSpan.textContent = !localIsStreaming ? 'Connection Failed. Is the backend running?' : 'WebSocket Error during stream.';
@@ -134,30 +186,20 @@ const LiveStreamPage = () => {
             }
         };
         
-        stopButton.onclick = () => {
-            statusSpan.classList.remove('error');
-            statusSpan.textContent = 'Idle. Press Start to begin.';
-            stopStreaming();
-        };
+        stopButton.onclick = stopStreaming;
+        patchCheckbox.onchange = () => { patchWarning.style.display = patchCheckbox.checked ? 'inline' : 'none'; };
 
-        patchCheckbox.onchange = () => {
-            patchWarning.style.display = patchCheckbox.checked ? 'inline' : 'none';
-        };
-
-        // --- Model and Task Management ---
         const modelsByTask = {
             denoise: [ { value: 'denoise_b', text: 'Uformer-B (High Quality)' }, { value: 'denoise_16', text: 'Uformer-16 (Fast)' } ],
             deblur: [ { value: 'deblur_b', text: 'Uformer-B (Deblur)' } ]
         };
-
         function populateModelSelect(taskType) {
             modelSelect.innerHTML = '';
             const models = modelsByTask[taskType];
             if (models) {
                 models.forEach(model => {
                     const option = document.createElement('option');
-                    option.value = model.value;
-                    option.textContent = model.text;
+                    option.value = model.value; option.textContent = model.text;
                     if (taskType === 'denoise' && model.value === 'denoise_16') option.selected = true;
                     else if (models.length === 1) option.selected = true;
                     modelSelect.appendChild(option);
@@ -165,16 +207,7 @@ const LiveStreamPage = () => {
             }
         }
         taskSelect.addEventListener('change', (event) => populateModelSelect(event.target.value));
-
-        // Initial population
         populateModelSelect(taskSelect.value);
-
-        // --- Cache Management ---
-        const clearCacheBtn = clearCacheBtnRef.current;
-        const clearImagesCheck = clearImagesCheckRef.current;
-        const clearVideosCheck = clearVideosCheckRef.current;
-        const imageCacheValue = imageCacheValueRef.current;
-        const videoCacheValue = videoCacheValueRef.current;
 
         async function updateCacheStatus() {
             try {
@@ -185,81 +218,55 @@ const LiveStreamPage = () => {
                 videoCacheValue.textContent = `${data.video_cache_mb} MB`;
             } catch (error) {
                 console.error("Failed to fetch cache status:", error);
-                imageCacheValue.textContent = `Error`;
-                videoCacheValue.textContent = `Error`;
+                imageCacheValue.textContent = `Error`; videoCacheValue.textContent = `Error`;
             }
         }
-
-        function toggleClearButtonState() {
-            clearCacheBtn.disabled = !clearImagesCheck.checked && !clearVideosCheck.checked;
-        }
-
+        function toggleClearButtonState() { clearCacheBtn.disabled = !clearImagesCheck.checked && !clearVideosCheck.checked; }
         clearImagesCheck.addEventListener('change', toggleClearButtonState);
         clearVideosCheck.addEventListener('change', toggleClearButtonState);
-        
         clearCacheBtn.onclick = async () => {
             if (!confirm(`Are you sure you want to clear the selected cache(s)?`)) return;
             try {
                 const url = new URL('http://127.0.0.1:8000/api/clear_cache');
                 url.searchParams.append('clear_images', clearImagesCheck.checked);
                 url.searchParams.append('clear_videos', clearVideosCheck.checked);
-
                 const response = await fetch(url, { method: 'POST' });
                 const result = await response.json();
                 if (!response.ok) throw new Error(result.detail || 'Failed to clear cache.');
                 alert(result.message || 'Cache cleared successfully!');
                 await updateCacheStatus();
-            } catch (error) {
-                alert(`An error occurred: ${error.message}`);
-            }
+            } catch (error) { alert(`An error occurred: ${error.message}`); }
         };
 
-        updateCacheStatus();
-        toggleClearButtonState();
-
-        // --- Model Loading Strategy Check and Button Control ---
-        const clearAllModelsBtn = clearAllModelsBtnRef.current;
         async function checkModelLoadingStrategy() {
             try {
                 const response = await fetch('http://127.0.0.1:8000/api/model_loading_strategy');
-                if (!response.ok) throw new Error("Failed to fetch model loading strategy");
-                const data = await response.json();
-                if (!data.load_all_on_startup && clearAllModelsBtn) {
-                    clearAllModelsBtn.style.display = 'block'; // Show the button if not loading all on startup
-                } else if (clearAllModelsBtn) {
-                    clearAllModelsBtn.style.display = 'none'; // Hide if loading all on startup
+                if (!response.ok) {
+                    // --- START of new diagnostic logging ---
+                    const errorText = await response.text().catch(() => "Could not read error response body.");
+                    console.error(`[DIAGNOSTIC] Fetch to /api/model_loading_strategy failed!`);
+                    console.error(`[DIAGNOSTIC] Status: ${response.status} (${response.statusText})`);
+                    console.error(`[DIAGNOSTIC] Response Body:`, errorText);
+                    // --- END of new diagnostic logging ---
+                    throw new Error(`Failed to fetch model loading strategy. Status: ${response.status}`);
                 }
+                const data = await response.json();
+                setIsVramControlVisible(!data.load_all_on_startup);
             } catch (error) {
-                console.error("Error fetching model loading strategy:", error);
-                if (clearAllModelsBtn) clearAllModelsBtn.style.display = 'none'; // Hide on error
+                console.error("Error in checkModelLoadingStrategy:", error);
+                setIsVramControlVisible(false);
             }
         }
 
-        if (clearAllModelsBtn) {
-            clearAllModelsBtn.onclick = async () => {
-                if (!confirm("Are you sure you want to unload all models from VRAM? This may cause a delay on subsequent requests.")) return;
-                try {
-                    const response = await fetch('http://127.0.0.1:8000/api/unload_models', { method: 'POST' });
-                    const result = await response.json();
-                    if (!response.ok) throw new Error(result.detail || 'Failed to unload models.');
-                    alert(result.message || 'Models unloaded successfully!');
-                    // Optionally, you might want to force a re-render or status update here
-                } catch (error) {
-                    alert(`An error occurred while unloading models: ${error.message}`);
-                }
-            };
-        }
+        updateCacheStatus();
+        toggleClearButtonState();
+        checkModelLoadingStrategy();
+        updateLoadedModelsStatus();
 
-        checkModelLoadingStrategy(); // Initial check on component mount
+        return stopStreaming;
+    }, [updateLoadedModelsStatus]);
 
-
-        // Cleanup function when the component unmounts
-        return () => {
-            stopStreaming();
-        };
-
-    }, []);
-
+    const isAnyModelLoaded = loadedModels.some(m => m.loaded);
 
     return (
         <>
@@ -288,10 +295,43 @@ const LiveStreamPage = () => {
                         <span className="cache-value" id="videoCacheValue" ref={videoCacheValueRef}>... MB</span>
                     </label>
                     <button id="clearCacheBtn" ref={clearCacheBtnRef}>Clear Selected</button>
-                    {/* New Clear All Models button */}
-                    <button id="clearAllModelsBtn" ref={clearAllModelsBtnRef} style={{ marginTop: '5px', padding: '6px 12px', fontSize: '0.9rem', backgroundColor: '#61dafb', color: '#20232a', border: 'none', borderRadius: '5px', cursor: 'pointer', display: 'none' }}>
-                        Clear All Models
-                    </button>
+
+                    {isVramControlVisible && (
+                        <div style={{ width: '100%', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #4a4f5a' }}>
+                            <div id="loadedModelsList" style={{ marginBottom: '5px', maxHeight: '80px', overflowY: 'auto' }}>
+                                {loadedModels.map(model => (
+                                    <label key={model.name} className="cache-line" style={{ fontSize: '0.85rem' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedModelsToClear.has(model.name)}
+                                            onChange={() => handleModelSelectionChange(model.name)}
+                                            disabled={!model.loaded}
+                                        />
+                                        <span className="cache-label-text">{model.name}</span>
+                                        <span style={{ color: model.loaded ? '#86e58b' : '#ff7a7a', fontWeight: 'bold' }}>
+                                            {model.loaded ? 'Loaded' : 'Unloaded'}
+                                        </span>
+                                    </label>
+                                ))}
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '5px', width: '100%' }}>
+                                <button
+                                    style={{ padding: '6px 10px', fontSize: '0.85rem', backgroundColor: '#f0e68c', color: '#333', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
+                                    disabled={selectedModelsToClear.size === 0}
+                                    onClick={() => handleClearModels(Array.from(selectedModelsToClear))}
+                                >
+                                    Clear Sel.
+                                </button>
+                                <button
+                                    style={{ padding: '6px 10px', fontSize: '0.85rem', backgroundColor: '#ff6b6b', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
+                                    disabled={!isAnyModelLoaded}
+                                    onClick={() => handleClearModels([])}
+                                >
+                                    Clear All
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </header>
             <div className="page-content">
@@ -306,9 +346,7 @@ const LiveStreamPage = () => {
                     </div>
                     <div className="control-group">
                         <label htmlFor="modelSelect">Enhancement Model</label>
-                        <select id="modelSelect" ref={modelSelectRef} style={{ padding: '8px', fontSize: '1rem', borderRadius: '4px', border: '1px solid #61dafb', backgroundColor: '#4a4f5a', color: 'white' }}>
-                            {/* Options will be dynamically populated */}
-                        </select>
+                        <select id="modelSelect" ref={modelSelectRef} style={{ padding: '8px', fontSize: '1rem', borderRadius: '4px', border: '1px solid #61dafb', backgroundColor: '#4a4f5a', color: 'white' }}></select>
                     </div>
                     <div className="control-group checkbox-group">
                         <label><input type="checkbox" id="fpsCheckbox" ref={fpsCheckboxRef} defaultChecked /> Show FPS Counter</label>
@@ -328,15 +366,11 @@ const LiveStreamPage = () => {
                     </div>
                     <div className="video-feeds-container">
                         <div className="video-box">
-                            <div className="video-header" style={{ justifyContent: 'center' }}>
-                                <h3>Original Webcam</h3>
-                            </div>
+                            <div className="video-header" style={{ justifyContent: 'center' }}><h3>Original Webcam</h3></div>
                             <video id="webcam" ref={webcamVideoRef} className="video" autoPlay playsInline muted></video>
                         </div>
                         <div className="video-box">
-                            <div className="video-header" style={{ justifyContent: 'center' }}>
-                                <h3>Enhanced Stream</h3>
-                            </div>
+                            <div className="video-header" style={{ justifyContent: 'center' }}><h3>Enhanced Stream</h3></div>
                             <img id="processedImage" ref={processedImageRef} className="image-display" alt="Processed stream from backend" />
                         </div>
                     </div>

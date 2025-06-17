@@ -178,8 +178,10 @@ async def load_models(device: torch.device, app_models: Dict[str, Any], load_all
                 app_models[key] = loaded_model
             except Exception as e:
                 print(f"Error loading model '{key}' at startup: {e}")
+
     elif load_definitions_only:
         # No actual model loading here, just definitions are set up in model_definitions_dict
+        print(f"--- [DIAGNOSTIC] Model definitions populated. Keys: {list(model_definitions_dict.keys())} ---")
         pass
     else:
         # This branch won't be hit by lifespan, but is for clarity if load_models were called differently

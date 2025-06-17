@@ -1,12 +1,18 @@
 # noctura-uformer/backend/app/api/endpoints/cache_management.py
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+from typing import List
 import os
 import shutil
 import traceback
 import torch
 
 from app.api.dependencies import app_models, unload_all_models_from_memory # Import app_models and the new utility
+from app.api.dependencies import model_definitions_dict # Import this here
+
+class UnloadModelsRequest(BaseModel):
+    model_names: List[str] = Field(default_factory=list)
 
 router = APIRouter()
 
@@ -93,18 +99,57 @@ async def clear_cache(clear_images: bool = True, clear_videos: bool = True):
         raise HTTPException(status_code=500, detail=f"Failed to clear cache: {e}")
 
 @router.post("/api/unload_models", tags=["cache_management"])
-async def unload_models_endpoint():
+async def unload_models_endpoint(request: UnloadModelsRequest):
     """
-    Unloads all Uformer models from VRAM and clears the CUDA cache.
-    This action is irreversible for the current server session without re-loading.
+    Unloads specified Uformer models from VRAM. If the 'model_names' list is empty,
+    all currently loaded models will be unloaded and the CUDA cache cleared.
     """
     try:
-        unload_all_models_from_memory(app_models)
-        return JSONResponse(status_code=200, content={"message": "All Uformer models unloaded from VRAM and CUDA cache cleared."})
+        model_names_to_unload = request.model_names
+        if model_names_to_unload:
+            print(f"Attempting to unload specific models: {model_names_to_unload}")
+            device = app_models.get("device", torch.device("cpu"))
+            unloaded_count = 0
+            for model_name in model_names_to_unload:
+                if model_name in app_models and model_name not in ['device', 'load_all_on_startup']:
+                    del app_models[model_name]
+                    unloaded_count += 1
+                    print(f"Model '{model_name}' unloaded.")
+            if device.type == 'cuda':
+                torch.cuda.empty_cache() # Clear CUDA cache after any unload
+                print("CUDA cache cleared.")
+
+            if unloaded_count == 0:
+                return JSONResponse(status_code=200, content={"message": "No specified models were loaded or eligible for unloading."})
+            else:
+                return JSONResponse(status_code=200, content={"message": f"Successfully unloaded {unloaded_count} specified Uformer models. CUDA cache cleared."})
+        else:
+            # "Clear all" logic when an empty list is sent
+            print("Received request to unload all models.")
+            unload_all_models_from_memory(app_models)
+            return JSONResponse(status_code=200, content={"message": "All Uformer models unloaded from VRAM and CUDA cache cleared."})
     except Exception as e:
         print(f"Error unloading models: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to unload models: {e}")
+
+@router.get("/api/loaded_models_status", tags=["cache_management"])
+async def get_loaded_models_status():
+    """
+    Returns a list of all known model definitions and their current loaded status in VRAM.
+    """
+    status_list = []
+    # model_definitions_dict contains all *possible* models with their initial instance and path
+    for model_name, model_info in model_definitions_dict.items():
+        # Check if the model instance is actually in app_models (meaning it's loaded)
+        is_loaded = model_name in app_models and model_name not in ['device', 'load_all_on_startup']
+        status_list.append({
+            "name": model_name,
+            "loaded": is_loaded
+        })
+    # Sort for consistent display in frontend
+    status_list.sort(key=lambda x: x['name'])
+    return JSONResponse(status_code=200, content={"models": status_list})
 
 @router.get("/api/model_loading_strategy", tags=["cache_management"])
 async def get_model_loading_strategy():

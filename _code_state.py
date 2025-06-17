@@ -34,7 +34,7 @@ FILES_TO_EXTRACT = [
     # --- Core Uformer Model Code (for inference) ---
     "backend/uformer_model/model.py",
     "backend/uformer_model/utils/image_utils.py",
-    "backend/uformer_model/utils/__init__.py",
+    # "backend/uformer_model/utils/__init__.py",
 
     # --- Original HTML User Interfaces (retained for debugging) ---
     "backend/image_processor.html",
@@ -44,14 +44,14 @@ FILES_TO_EXTRACT = [
     # --- Next.js Frontend Application ---
     "frontend/.gitignore", # Frontend specific .gitignore
     "frontend/README.md", # Frontend specific README.md
-    "frontend/package.json",
-    "frontend/package-lock.json",
-    "frontend/next.config.mjs",
-    "frontend/jsconfig.json",
-    "frontend/eslint.config.mjs",
+    # "frontend/package.json",
+    # "frontend/package-lock.json",
+    # "frontend/next.config.mjs",
+    # "frontend/jsconfig.json",
+    # "frontend/eslint.config.mjs",
     "frontend/src/styles/globals.css",
     "frontend/src/pages/_app.js",
-    "frontend/src/pages/_document.js",
+    # "frontend/src/pages/_document.js",
     "frontend/src/pages/index.js", # Live Stream page
     "frontend/src/pages/image-processor.js", # Image File page
     "frontend/src/pages/video-processor.js", # Video File page
