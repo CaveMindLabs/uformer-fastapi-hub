@@ -14,8 +14,9 @@ import uuid
 import traceback
 import rawpy
 
+      
 # Import the dependency to get our loaded models
-from app.api.dependencies import get_models
+from app.api.dependencies import get_models, get_model_by_name # Import the new model dependency
 
 router = APIRouter()
 
@@ -34,7 +35,9 @@ def pad_image_to_multiple(image_np: np.ndarray, multiple: int, mode='reflect') -
         return image_np, (original_h, original_w)
 
     padded_image = np.pad(image_np, ((0, pad_h), (0, pad_w), (0, 0)), mode=mode)
-    return padded_image, (original_h, original_w)
+    # Removed original_h, original_w as it's not used
+    # If needed replace teh return with "return padded_image, (original_h, original_w)"
+    return padded_image, (0, 0) 
 
 
 @router.post("/api/generate_preview", tags=["image_file_processing"])
@@ -73,20 +76,18 @@ async def generate_preview(image_file: UploadFile = File(...)):
 @router.post("/api/process_image")
 async def process_image(
     image_file: UploadFile = File(...),
-    task_type: str = Form("denoise"), # New parameter from frontend
+    task_type: str = Form("denoise"),
     model_name: str = Form("denoise_b"),
     use_patch_processing: bool = Form(True),
-    models: Dict[str, Any] = Depends(get_models)
+    uformer_model: torch.nn.Module = Depends(get_model_by_name) # Use the new dependency
 ):
     """
     Accepts an image file, processes it using the selected Uformer model and task, 
     and returns the enhanced image. Saves files into task-specific subdirectories.
     """
-    if model_name not in models:
-        raise HTTPException(status_code=400, detail=f"Invalid model name: {model_name}. Available models: {[k for k in models if k != 'device']}")
-    
-    uformer_model = models[model_name]
-    device = models["device"]
+    # 'uformer_model' is now directly injected, already loaded or freshly loaded
+    # 'models' dict (from get_models) is NOT needed here anymore
+    device = uformer_model.device # Get device directly from the model instance
     patch_size = 256
 
     try:

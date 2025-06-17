@@ -16,6 +16,7 @@ FILES_TO_EXTRACT = [
     "README.md", # Add README for the final documentation phase
 
     # --- FastAPI Backend Application ---
+    "backend/.env.example",
     "backend/app/main.py",
     "backend/app/api/dependencies.py",
     "backend/app/api/endpoints/image_file_processing.py",

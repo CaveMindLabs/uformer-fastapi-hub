@@ -1,5 +1,5 @@
 # noctura-uformer/backend/app/api/endpoints/live_stream_processing.py
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException
 from typing import Dict, Any, Tuple
 import base64
 import io
@@ -10,12 +10,12 @@ import cv2
 import numpy as np
 from PIL import Image
 
-# Import the dependency to get our loaded models
-from app.api.dependencies import get_models
+# Import the dependency to get our loaded models and the specific model getter
+from app.api.dependencies import get_models, get_model_by_name
 
 router = APIRouter()
 
-# Helper function for image padding
+# Helper function for image padding (Keep this as is, it's correct)
 def pad_image_to_multiple(image_np: np.ndarray, multiple: int, mode='reflect') -> Tuple[np.ndarray, Tuple[int, int]]:
     """
     Pads an image to ensure its height and width are multiples of 'multiple'.
@@ -35,17 +35,21 @@ def pad_image_to_multiple(image_np: np.ndarray, multiple: int, mode='reflect') -
 @router.websocket("/ws/process_video")
 async def websocket_process_video(
     websocket: WebSocket,
-    models: Dict[str, Any] = Depends(get_models)
+    models_container: Dict[str, Any] = Depends(get_models) # Use models_container to access app_models
 ):
     await websocket.accept()
     print("[WS-BACKEND] ==> WebSocket connection accepted.")
 
-    device = models["device"]
-    patch_size = 256
+    device = models_container["device"] # Get device from the container
+    patch_size = 256 # Define patch_size here
     
     prev_frame_time = 0
     
     try:
+        # We need to manually resolve get_model_by_name here because WebSocket dependencies
+        # are processed per connection, not per message. We need to fetch it dynamically.
+        # However, get_model_by_name is a synchronous function.
+        
         while True:
             data = await websocket.receive_json()
             image_b64 = data["image_b64"]
@@ -55,12 +59,16 @@ async def websocket_process_video(
             show_fps = data.get("show_fps", False)
             use_patch_processing = data.get("use_patch_processing", False)
 
-            # Select the model based on the name received
-            if model_name not in models:
-                # Handle invalid model name gracefully in WebSocket
-                await websocket.send_json({"error": f"Invalid model name: {model_name}"})
-                continue
-            uformer_model = models[model_name]
+            try:
+                # IMPORTANT: Call get_model_by_name directly, it is NOT an awaitable.
+                # Pass the model_name and the models_container (app_models) to it.
+                uformer_model = get_model_by_name(model_name=model_name, models=models_container)
+            except HTTPException as e:
+                # If get_model_by_name raises an HTTPException (e.g., model not found/failed to load)
+                # we catch it and send an error back to the client, then continue the loop.
+                print(f"[WS-BACKEND] Model loading error: {e.detail}")
+                await websocket.send_json({"error": f"Model loading error: {e.detail}"})
+                continue # Skip processing this frame and wait for the next message
 
             img_bytes = base64.b64decode(image_b64.split(',')[1])
             image_pil = Image.open(io.BytesIO(img_bytes)).convert("RGB")

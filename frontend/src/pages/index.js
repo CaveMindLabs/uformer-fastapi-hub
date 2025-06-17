@@ -23,7 +23,8 @@ const LiveStreamPage = () => {
     const clearVideosCheckRef = useRef(null);
     const imageCacheValueRef = useRef(null);
     const videoCacheValueRef = useRef(null);
-    
+    const clearAllModelsBtnRef = useRef(null); // New ref for the Clear All Models button
+
     // State variables to manage dynamic data and UI state.
     const [isStreaming, setIsStreaming] = useState(false);
 
@@ -216,12 +217,48 @@ const LiveStreamPage = () => {
         updateCacheStatus();
         toggleClearButtonState();
 
+        // --- Model Loading Strategy Check and Button Control ---
+        const clearAllModelsBtn = clearAllModelsBtnRef.current;
+        async function checkModelLoadingStrategy() {
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/model_loading_strategy');
+                if (!response.ok) throw new Error("Failed to fetch model loading strategy");
+                const data = await response.json();
+                if (!data.load_all_on_startup && clearAllModelsBtn) {
+                    clearAllModelsBtn.style.display = 'block'; // Show the button if not loading all on startup
+                } else if (clearAllModelsBtn) {
+                    clearAllModelsBtn.style.display = 'none'; // Hide if loading all on startup
+                }
+            } catch (error) {
+                console.error("Error fetching model loading strategy:", error);
+                if (clearAllModelsBtn) clearAllModelsBtn.style.display = 'none'; // Hide on error
+            }
+        }
+
+        if (clearAllModelsBtn) {
+            clearAllModelsBtn.onclick = async () => {
+                if (!confirm("Are you sure you want to unload all models from VRAM? This may cause a delay on subsequent requests.")) return;
+                try {
+                    const response = await fetch('http://127.0.0.1:8000/api/unload_models', { method: 'POST' });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.detail || 'Failed to unload models.');
+                    alert(result.message || 'Models unloaded successfully!');
+                    // Optionally, you might want to force a re-render or status update here
+                } catch (error) {
+                    alert(`An error occurred while unloading models: ${error.message}`);
+                }
+            };
+        }
+
+        checkModelLoadingStrategy(); // Initial check on component mount
+
+
         // Cleanup function when the component unmounts
         return () => {
             stopStreaming();
         };
 
-    }, []); // The empty array [] means this effect runs only once on mount.
+    }, []);
 
 
     return (
@@ -251,6 +288,10 @@ const LiveStreamPage = () => {
                         <span className="cache-value" id="videoCacheValue" ref={videoCacheValueRef}>... MB</span>
                     </label>
                     <button id="clearCacheBtn" ref={clearCacheBtnRef}>Clear Selected</button>
+                    {/* New Clear All Models button */}
+                    <button id="clearAllModelsBtn" ref={clearAllModelsBtnRef} style={{ marginTop: '5px', padding: '6px 12px', fontSize: '0.9rem', backgroundColor: '#61dafb', color: '#20232a', border: 'none', borderRadius: '5px', cursor: 'pointer', display: 'none' }}>
+                        Clear All Models
+                    </button>
                 </div>
             </header>
             <div className="page-content">

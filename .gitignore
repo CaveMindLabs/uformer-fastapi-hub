@@ -4,8 +4,6 @@
 venv/
 ENV/
 env/
-# Pipenv
-# Pipfile.lock
 
 # Byte-compiled / optimized / C extensions
 __pycache__/
@@ -13,10 +11,13 @@ __pycache__/
 *.pyo
 *.pyd
 
+# Local environment files
+backend/.env
+
+# --- Generated & Temporary Files ---
 # Application specific temporary/log files
 backend/model_weights/
 backend/temp/
-# --- Generated & Temporary Files ---
 # Log files for model key debugging
 backend/debug_logs/
 debug_keys.txt

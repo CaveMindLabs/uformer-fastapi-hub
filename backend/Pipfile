@@ -28,6 +28,7 @@ Pillow = "*"
 python-multipart = "*"
 ffmpeg-python = "*"
 rawpy = "*"
+python-dotenv = "*"
 
 [dev-packages]
 

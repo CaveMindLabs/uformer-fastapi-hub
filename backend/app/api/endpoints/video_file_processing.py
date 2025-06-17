@@ -13,7 +13,7 @@ import traceback
 from tqdm import tqdm
 
 # Import shared models from dependencies
-from app.api.dependencies import get_models
+from app.api.dependencies import get_models, get_model_by_name # Import the new model dependency
 
 router = APIRouter()
 
@@ -37,19 +37,39 @@ def pad_image_to_multiple(image_np: np.ndarray, multiple: int, mode='reflect') -
     padded_image = np.pad(image_np, ((0, pad_h), (0, pad_w), (0, 0)), mode=mode)
     return padded_image, (original_h, original_w)
 
-def video_processing_task(task_id: str, input_path: str, output_path: str, model_name: str, models: Dict[str, Any]):
+def video_processing_task(task_id: str, input_path: str, output_path: str, model_name: str, models_container: Dict[str, Any]):
     """
     Processes a video frame-by-frame using a patch-based approach with the selected Uformer model.
+    NOTE: 'models_container' is the full app_models dict, needed because get_model_by_name isn't a direct FastAPI dependency here.
     """
     tasks[task_id]['status'] = 'processing'
     print(f"[VIDEO_PROCESSOR] Task {task_id}: Starting processing for {input_path} with model '{model_name}'")
 
     try:
-        if model_name not in models:
-            raise RuntimeError(f"Invalid model name provided to task: {model_name}")
+        # Manually invoke the loading logic for background task
+        # This replicates the behavior of get_model_by_name for a background task.
+        if model_name not in models_container:
+            device = models_container.get("device")
+            from app.api.dependencies import model_definitions_dict, _load_single_model_weights, app_models # Import necessary modules here
+            debug_log_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'debug_logs'))
+
+            if model_name not in model_definitions_dict:
+                raise RuntimeError(f"Model definition for '{model_name}' not found. Invalid model_name.")
             
-        uformer_model = models[model_name]
-        device = models["device"]
+            print(f"Loading model '{model_name}' on demand for background task...")
+            model_info = model_definitions_dict[model_name]
+            loaded_instance = _load_single_model_weights(
+                model_info['instance'],
+                model_info['path'],
+                model_name,
+                debug_log_dir,
+                device
+            )
+            models_container[model_name] = loaded_instance # Cache the loaded model
+            print(f"Model '{model_name}' loaded successfully on demand for background task.")
+        
+        uformer_model = models_container[model_name]
+        device = models_container["device"]
         patch_size = 256
 
         # 1. Open video and get properties
@@ -126,9 +146,11 @@ def video_processing_task(task_id: str, input_path: str, output_path: str, model
 async def process_video(
     background_tasks: BackgroundTasks,
     video_file: UploadFile = File(...),
-    task_type: str = Form("denoise"), # Add task_type from frontend
+    task_type: str = Form("denoise"),
     model_name: str = Form("denoise_b"),
-    models: Dict[str, Any] = Depends(get_models)
+    # We use get_models here to ensure app_models dict and device are initialized,
+    # but actual model loading for background task is manual within video_processing_task.
+    models_container: Dict[str, Any] = Depends(get_models) 
 ):
     # Define task-specific subdirectories
     base_temp_dir = os.path.join("temp", "videos", task_type)
@@ -149,8 +171,8 @@ async def process_video(
 
     tasks[task_id] = {"status": "pending", "filename": sanitized_filename, "result_path": None, "error": None}
     
-    # Pass the selected model_name to the background task
-    background_tasks.add_task(video_processing_task, task_id, input_path, output_path, model_name, models)
+    # Pass the selected model_name and the entire app_models dict to the background task
+    background_tasks.add_task(video_processing_task, task_id, input_path, output_path, model_name, models_container)
     
     return JSONResponse(status_code=202, content={"task_id": task_id, "message": "Video upload successful, processing started."})
 
