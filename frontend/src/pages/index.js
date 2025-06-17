@@ -343,24 +343,43 @@ const LiveStreamPage = () => {
                     {/* Right Column for VRAM Management (model loading/unloading) */}
                     {isVramControlVisible && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minWidth: '200px', paddingTop: '0px', alignItems: 'stretch' }}> {/* Removed alignItems: 'flex-end', added alignItems: 'stretch' or simply remove it as stretch is default for flex-direction column*/}
+                            <style jsx>{`
+                                .vram-button {
+                                    padding: 6px 10px;
+                                    font-size: 0.85rem;
+                                    border: none;
+                                    border-radius: 5px;
+                                    cursor: pointer;
+                                    transition: background-color 0.2s;
+                                }
+                                .vram-button.clear-selected {
+                                    background-color: #f0e68c;
+                                    color: #333;
+                                }
+                                .vram-button.clear-all {
+                                    background-color: #61dafb;
+                                    color: #20232a;
+                                }
+                                .vram-button:hover:not(:disabled) {
+                                    filter: brightness(0.9);
+                                }
+                                .vram-button:disabled {
+                                    background-color: #cccccc;
+                                    color: #666666;
+                                    cursor: not-allowed;
+                                }
+                            `}</style>
                             <div id="loadedModelsList" style={{ marginBottom: '5px', maxHeight: '80px', overflowY: 'auto', width: '100%' }}>
                                 {loadedModels.map(model => (
-                                    <label key={model.name} className="cache-line" style={{
-                                        fontSize: '0.85rem',
-                                        justifyContent: 'flex-start',
-                                        padding: '0', // Zero out all padding on the label
-                                        margin: '0', // Zero out all margin on the label
-                                        width: '100%', // Ensure it takes full width of its parent flex container
-                                        boxSizing: 'border-box' // Include padding/border in element's total width
-                                    }}>
+                                    <label key={model.name} className="cache-line" style={{ fontSize: '0.85rem', justifyContent: 'flex-start', padding: '0', margin: '0', width: '100%', boxSizing: 'border-box' }}>
                                         <input
                                             type="checkbox"
                                             checked={selectedModelsToClear.has(model.name)}
                                             onChange={() => handleModelSelectionChange(model.name)}
                                             disabled={!model.loaded}
-                                            style={{ margin: '0', flexShrink: 0 }} // Zero out all margin, and ensure it doesn't shrink
+                                            style={{ margin: '0', flexShrink: 0 }}
                                         />
-                                        <span className="cache-label-text" style={{ marginLeft: '8px' }}>{model.name}</span> {/* Apply gap manually here for spacing */}
+                                        <span className="cache-label-text" style={{ marginLeft: '8px' }}>{model.name}</span>
                                         <span style={{ color: model.loaded ? '#86e58b' : '#ff7a7a', fontWeight: 'bold', minWidth: '65px', textAlign: 'right', marginLeft: 'auto' }}>
                                             {model.loaded ? 'Loaded' : 'Unloaded'}
                                         </span>
@@ -369,15 +388,14 @@ const LiveStreamPage = () => {
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
                                 <button
-                                    style={{ padding: '6px 10px', fontSize: '0.85rem', backgroundColor: '#f0e68c', color: '#333', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
+                                    className="vram-button clear-selected"
                                     disabled={selectedModelsToClear.size === 0}
                                     onClick={() => handleClearModels(Array.from(selectedModelsToClear))}
                                 >
                                     Clear Selected
                                 </button>
-                                {/* Changed to a blue tone */}
                                 <button
-                                    style={{ padding: '6px 10px', fontSize: '0.85rem', backgroundColor: '#61dafb', color: '#20232a', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
+                                    className="vram-button clear-all"
                                     disabled={!isAnyModelLoaded}
                                     onClick={() => handleClearModels([])}
                                 >
