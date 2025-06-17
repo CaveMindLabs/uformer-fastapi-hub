@@ -3,6 +3,82 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 
+const CacheManager = () => {
+    const [imageCacheMb, setImageCacheMb] = useState('...');
+    const [videoCacheMb, setVideoCacheMb] = useState('...');
+    const [clearImages, setClearImages] = useState(false);
+    const [clearVideos, setClearVideos] = useState(false);
+
+    const updateStatus = useCallback(async () => {
+        try {
+            const response = await fetch('http://127.0.0.1:8000/api/cache_status');
+            if (!response.ok) throw new Error("Failed to fetch cache status");
+            const data = await response.json();
+            setImageCacheMb(data.image_cache_mb);
+            setVideoCacheMb(data.video_cache_mb);
+        } catch (error) {
+            console.error(error);
+            setImageCacheMb('Error');
+            setVideoCacheMb('Error');
+        }
+    }, []);
+
+    useEffect(() => {
+        updateStatus();
+    }, [updateStatus]);
+
+    const handleClear = async () => {
+        if (!confirm(`Are you sure you want to clear the selected cache(s)?`)) return;
+
+        try {
+            const url = new URL('http://127.0.0.1:8000/api/clear_cache');
+            url.searchParams.append('clear_images', clearImages);
+            url.searchParams.append('clear_videos', clearVideos);
+            const response = await fetch(url, { method: 'POST' });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.detail || 'Failed to clear cache.');
+            alert(result.message || 'Cache cleared successfully!');
+            
+            // Reset checkboxes and update status after a successful clear
+            setClearImages(false);
+            setClearVideos(false);
+            await updateStatus();
+
+        } catch (error) {
+            alert(`An error occurred: ${error.message}`);
+        }
+    };
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '5px', minWidth: '150px' }}>
+            <style jsx>{`
+                /* This rule targets the button by its ID, but only when it is NOT disabled. */
+                #clearCacheBtn:not(:disabled):hover {
+                    background-color: #e05252; /* This is a darker red for the hover effect */
+                    border-color: #d04242;
+                }
+            `}</style>
+            <label className="cache-line">
+                <input type="checkbox" checked={clearImages} onChange={(e) => setClearImages(e.target.checked)} />
+                <span className="cache-label-text">Image Cache:</span>
+                <span className="cache-value">{imageCacheMb} MB</span>
+            </label>
+            <label className="cache-line">
+                <input type="checkbox" checked={clearVideos} onChange={(e) => setClearVideos(e.target.checked)} />
+                <span className="cache-label-text">Video Cache:</span>
+                <span className="cache-value">{videoCacheMb} MB</span>
+            </label>
+            <button
+                id="clearCacheBtn"
+                onClick={handleClear}
+                disabled={!clearImages && !clearVideos}
+            >
+                Clear Selected
+            </button>
+        </div>
+    );
+};
+
 const LiveStreamPage = () => {
     // --- Refs for direct DOM access ---
     const startButtonRef = useRef(null);
@@ -15,11 +91,7 @@ const LiveStreamPage = () => {
     const fpsCheckboxRef = useRef(null);
     const patchCheckboxRef = useRef(null);
     const patchWarningRef = useRef(null);
-    const clearCacheBtnRef = useRef(null);
-    const clearImagesCheckRef = useRef(null);
-    const clearVideosCheckRef = useRef(null);
-    const imageCacheValueRef = useRef(null);
-    const videoCacheValueRef = useRef(null);
+    // Refs for the cache manager have been removed as it's now a self-contained component.
     
     // --- State for React to manage UI ---
     const [isStreaming, setIsStreaming] = useState(false);
@@ -103,11 +175,6 @@ const LiveStreamPage = () => {
         const fpsCheckbox = fpsCheckboxRef.current;
         const patchCheckbox = patchCheckboxRef.current;
         const patchWarning = patchWarningRef.current;
-        const clearCacheBtn = clearCacheBtnRef.current;
-        const clearImagesCheck = clearImagesCheckRef.current;
-        const clearVideosCheck = clearVideosCheckRef.current;
-        const imageCacheValue = imageCacheValueRef.current;
-        const videoCacheValue = videoCacheValueRef.current;
 
         const stopStreaming = () => {
             localIsStreaming = false;
@@ -209,34 +276,9 @@ const LiveStreamPage = () => {
         taskSelect.addEventListener('change', (event) => populateModelSelect(event.target.value));
         populateModelSelect(taskSelect.value);
 
-        async function updateCacheStatus() {
-            try {
-                const response = await fetch('http://127.0.0.1:8000/api/cache_status');
-                if (!response.ok) throw new Error("Server status check failed");
-                const data = await response.json();
-                imageCacheValue.textContent = `${data.image_cache_mb} MB`;
-                videoCacheValue.textContent = `${data.video_cache_mb} MB`;
-            } catch (error) {
-                console.error("Failed to fetch cache status:", error);
-                imageCacheValue.textContent = `Error`; videoCacheValue.textContent = `Error`;
-            }
-        }
-        function toggleClearButtonState() { clearCacheBtn.disabled = !clearImagesCheck.checked && !clearVideosCheck.checked; }
-        clearImagesCheck.addEventListener('change', toggleClearButtonState);
-        clearVideosCheck.addEventListener('change', toggleClearButtonState);
-        clearCacheBtn.onclick = async () => {
-            if (!confirm(`Are you sure you want to clear the selected cache(s)?`)) return;
-            try {
-                const url = new URL('http://127.0.0.1:8000/api/clear_cache');
-                url.searchParams.append('clear_images', clearImagesCheck.checked);
-                url.searchParams.append('clear_videos', clearVideosCheck.checked);
-                const response = await fetch(url, { method: 'POST' });
-                const result = await response.json();
-                if (!response.ok) throw new Error(result.detail || 'Failed to clear cache.');
-                alert(result.message || 'Cache cleared successfully!');
-                await updateCacheStatus();
-            } catch (error) { alert(`An error occurred: ${error.message}`); }
-        };
+        // Note: The logic for cache status, button state, and click handling
+        // has been moved outside this useEffect and converted to standard React
+        // hooks (useState, useCallback, useEffect) for better, safer state management.
 
         async function checkModelLoadingStrategy() {
             try {
@@ -258,12 +300,14 @@ const LiveStreamPage = () => {
             }
         }
 
-        updateCacheStatus();
-        toggleClearButtonState();
         checkModelLoadingStrategy();
         updateLoadedModelsStatus();
 
-        return stopStreaming;
+        // Cleanup: remove event listeners when component unmounts
+        return () => {
+            stopStreaming();
+            // No cleanup is needed for cache listeners anymore, as they are handled by React's declarative JSX.
+        };
     }, [updateLoadedModelsStatus]);
 
     const isAnyModelLoaded = loadedModels.some(m => m.loaded);
@@ -283,47 +327,48 @@ const LiveStreamPage = () => {
                     <h1>🦉 NocturaVision <span style={{ fontWeight: 300, color: '#ccc' }}>| Uformer</span></h1>
                     <p>Real-time Enhancement</p>
                 </div>
-                <div className="cache-info-block">
-                    <label className="cache-line">
-                        <input type="checkbox" id="clearImagesCheck" ref={clearImagesCheckRef} defaultChecked={false} />
-                        <span className="cache-label-text">Image Cache:</span>
-                        <span className="cache-value" id="imageCacheValue" ref={imageCacheValueRef}>... MB</span>
-                    </label>
-                    <label className="cache-line">
-                        <input type="checkbox" id="clearVideosCheck" ref={clearVideosCheckRef} defaultChecked={false} />
-                        <span className="cache-label-text">Video Cache:</span>
-                        <span className="cache-value" id="videoCacheValue" ref={videoCacheValueRef}>... MB</span>
-                    </label>
-                    <button id="clearCacheBtn" ref={clearCacheBtnRef}>Clear Selected</button>
-
+                {/* Main container for both cache and VRAM controls, set to display row */}
+                <div className="cache-info-block" style={{ flexDirection: 'row', gap: '20px', alignItems: 'flex-start', width: 'auto' }}>
+                    {/* Left Column for general cache management (now a self-contained component) */}
+                    <CacheManager />
+                    {/* Right Column for VRAM Management (model loading/unloading) */}
                     {isVramControlVisible && (
-                        <div style={{ width: '100%', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #4a4f5a' }}>
-                            <div id="loadedModelsList" style={{ marginBottom: '5px', maxHeight: '80px', overflowY: 'auto' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minWidth: '200px', paddingTop: '0px', alignItems: 'stretch' }}> {/* Removed alignItems: 'flex-end', added alignItems: 'stretch' or simply remove it as stretch is default for flex-direction column*/}
+                            <div id="loadedModelsList" style={{ marginBottom: '5px', maxHeight: '80px', overflowY: 'auto', width: '100%' }}>
                                 {loadedModels.map(model => (
-                                    <label key={model.name} className="cache-line" style={{ fontSize: '0.85rem' }}>
+                                    <label key={model.name} className="cache-line" style={{
+                                        fontSize: '0.85rem',
+                                        justifyContent: 'flex-start',
+                                        padding: '0', // Zero out all padding on the label
+                                        margin: '0', // Zero out all margin on the label
+                                        width: '100%', // Ensure it takes full width of its parent flex container
+                                        boxSizing: 'border-box' // Include padding/border in element's total width
+                                    }}>
                                         <input
                                             type="checkbox"
                                             checked={selectedModelsToClear.has(model.name)}
                                             onChange={() => handleModelSelectionChange(model.name)}
                                             disabled={!model.loaded}
+                                            style={{ margin: '0', flexShrink: 0 }} // Zero out all margin, and ensure it doesn't shrink
                                         />
-                                        <span className="cache-label-text">{model.name}</span>
-                                        <span style={{ color: model.loaded ? '#86e58b' : '#ff7a7a', fontWeight: 'bold' }}>
+                                        <span className="cache-label-text" style={{ marginLeft: '8px' }}>{model.name}</span> {/* Apply gap manually here for spacing */}
+                                        <span style={{ color: model.loaded ? '#86e58b' : '#ff7a7a', fontWeight: 'bold', minWidth: '65px', textAlign: 'right', marginLeft: 'auto' }}>
                                             {model.loaded ? 'Loaded' : 'Unloaded'}
                                         </span>
                                     </label>
                                 ))}
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '5px', width: '100%' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
                                 <button
                                     style={{ padding: '6px 10px', fontSize: '0.85rem', backgroundColor: '#f0e68c', color: '#333', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
                                     disabled={selectedModelsToClear.size === 0}
                                     onClick={() => handleClearModels(Array.from(selectedModelsToClear))}
                                 >
-                                    Clear Sel.
+                                    Clear Selected
                                 </button>
+                                {/* Changed to a blue tone */}
                                 <button
-                                    style={{ padding: '6px 10px', fontSize: '0.85rem', backgroundColor: '#ff6b6b', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
+                                    style={{ padding: '6px 10px', fontSize: '0.85rem', backgroundColor: '#61dafb', color: '#20232a', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
                                     disabled={!isAnyModelLoaded}
                                     onClick={() => handleClearModels([])}
                                 >
