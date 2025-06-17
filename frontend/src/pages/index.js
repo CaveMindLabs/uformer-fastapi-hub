@@ -172,6 +172,7 @@ const LiveStreamPage = () => {
         let websocket;
         let stream;
         let localIsStreaming = false;
+        let modelStatusInterval = null; // Variable to hold our polling timer
         const WS_URL = "ws://127.0.0.1:8000/ws/process_video";
 
         const startButton = startButtonRef.current;
@@ -186,6 +187,12 @@ const LiveStreamPage = () => {
         const patchWarning = patchWarningRef.current;
 
         const stopStreaming = () => {
+            // Stop the polling timer as soon as the stream stops
+            if (modelStatusInterval) {
+                clearInterval(modelStatusInterval);
+                modelStatusInterval = null;
+            }
+
             localIsStreaming = false;
             setIsStreaming(false);
             if (websocket) {
@@ -240,7 +247,10 @@ const LiveStreamPage = () => {
                     startButton.disabled = true; stopButton.disabled = false;
                     localIsStreaming = true; setIsStreaming(true);
                     requestAnimationFrame(processAndSendFrame); 
-                    updateLoadedModelsStatus();
+                    
+                    // Start polling the model status every 2 seconds
+                    if (modelStatusInterval) clearInterval(modelStatusInterval); // Clear any old interval
+                    modelStatusInterval = setInterval(updateLoadedModelsStatus, 2000);
                 };
                 websocket.onmessage = (event) => {
                     processedImage.src = event.data;
