@@ -50,7 +50,9 @@ const CacheManager = () => {
     };
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '5px', minWidth: '150px' }}>
+        // The main container no longer uses 'alignItems: flex-end'.
+        // This allows its children to stretch to the full width.
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minWidth: '150px' }}>
             <style jsx>{`
                 /* This rule targets the button by its ID, but only when it is NOT disabled. */
                 #clearCacheBtn:not(:disabled):hover {
@@ -68,13 +70,17 @@ const CacheManager = () => {
                 <span className="cache-label-text">Video Cache:</span>
                 <span className="cache-value">{videoCacheMb} MB</span>
             </label>
-            <button
-                id="clearCacheBtn"
-                onClick={handleClear}
-                disabled={!clearImages && !clearVideos}
-            >
-                Clear Selected
-            </button>
+
+            {/* A new wrapper div to center the button */}
+            <div style={{ display: 'flex', justifyContent: 'center', width: '100%', marginTop: '5px' }}>
+                <button
+                    id="clearCacheBtn"
+                    onClick={handleClear}
+                    disabled={!clearImages && !clearVideos}
+                >
+                    Clear Selected
+                </button>
+            </div>
         </div>
     );
 };
