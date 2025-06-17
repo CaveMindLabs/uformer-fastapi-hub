@@ -16,14 +16,27 @@
         .title-block { text-align: center; }
         .title-block h1 { margin: 0 0 5px 0; font-size: 2.2rem; }
         .title-block p { margin: 0; font-size: 1rem; color: #ccc; }
-        .cache-info-block { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; width: 235px; /* Match nav-bar width */ }
-        .cache-line { display: flex; align-items: center; width: 100%; gap: 8px; font-size: 0.9rem; cursor: pointer; }
-        .cache-line input[type="checkbox"] { flex-shrink: 0; }
+        
+        /* --- Replicated Two-Column Header Controls --- */
+        .controls-container { display: flex; flex-direction: row; gap: 20px; align-items: stretch; }
+        .control-column { display: flex; flex-direction: column; }
+        .cache-line { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer; }
         .cache-label-text { flex-grow: 1; text-align: left; color: #ccc; }
         .cache-value { font-weight: bold; min-width: 70px; text-align: right; color: white; }
-        #clearCacheBtn { margin-top: 5px; padding: 6px 12px; font-size: 0.9rem; background-color: #ff6b6b; color: white; border: none; border-radius: 5px; cursor: pointer; }
-        #clearCacheBtn:hover:not(:disabled) { background-color: #e05252; } /* Only hover if not disabled */
-        #clearCacheBtn:disabled { background-color: #555; color: #888; cursor: not-allowed; } /* Style for disabled state */
+        #vramManagerBlock { display: none; /* Hidden by default, enabled by JS */ }
+        #loadedModelsList { margin-bottom: 5px; max-height: 80px; overflow-y: auto; width: 100%; }
+        #clearCacheBtn { padding: 6px 12px; font-size: 0.9rem; background-color: #ff6b6b; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        #clearCacheBtn:hover:not(:disabled) { background-color: #e05252; border-color: #d04242; }
+        
+        /* VRAM Buttons Styling */
+        .vram-button { padding: 6px 10px; font-size: 0.85rem; border: none; border-radius: 5px; cursor: pointer; transition: filter 0.2s; }
+        #clearSelectedModelsBtn { background-color: #f0e68c; color: #333; }
+        #clearAllModelsBtn { background-color: #61dafb; color: #20232a; }
+        .vram-button:hover:not(:disabled) { filter: brightness(0.9); }
+        .button-row { display: flex; justify-content: space-between; width: 100%; }
+        
+        /* Generic Disabled Styles for ALL Buttons */
+        button:disabled { background-color: #555 !important; color: #888 !important; cursor: not-allowed !important; filter: none !important; }
 
         /* --- Page-Specific Content --- */
         .page-content { display: flex; flex-grow: 1; padding: 20px; gap: 20px; box-sizing: border-box; min-height: 0; }
@@ -36,14 +49,15 @@
         .actions-bar { display: flex; align-items: center; gap: 20px; background-color: #4a4f5a; padding: 15px; border-radius: 8px; flex-shrink: 0; }
         #startButton, #stopButton { font-size: 1.1rem; padding: 10px 20px; cursor: pointer; border: none; border-radius: 5px; background-color: #61dafb; color: #20232a; font-weight: bold; transition: background-color 0.2s; }
         #startButton:hover:not(:disabled), #stopButton:hover:not(:disabled) { background-color: #52b8d8; }
-        #startButton:disabled, #stopButton:disabled { background-color: #555; color: #888; cursor: not-allowed; }
         #status { font-style: italic; color: #ccc; }
         #status.error { color: #ff6b6b; font-weight: bold; }
         .video-feeds-container { display: flex; gap: 20px; flex-grow: 1; min-height: 0; }
         .video-box { flex: 1; background-color: #4a4f5a; border-radius: 8px; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; }
         .video-box h3 { margin: 0; color: #61dafb; flex-shrink: 0; }
         .video-box video, .video-box img { width: 100%; height: 100%; max-height: 100%; border-radius: 5px; border: 2px solid #ccc; background-color: #20232a; aspect-ratio: 4 / 3; object-fit: contain; box-sizing: border-box; }
-        #webcam { transform: scaleX(-1); }
+        
+        /* Apply mirror effect to both video feeds for a consistent user experience */
+        #webcam, #processedImage { transform: scaleX(-1); }
     </style>
 </head>
 <body>
@@ -51,24 +65,39 @@
         <div class="nav-bar">
             <a href="wstest_uformer.html" class="nav-button active">Live Stream</a>
             <a href="video_processor.html" class="nav-button">Video File</a>
-            <a href="image_processor.html" class="nav-button">Image File</a> <!-- To be implemented -->
+            <a href="image_processor.html" class="nav-button">Image File</a>
         </div>
         <div class="title-block">
             <h1>🦉 NocturaVision <span style="font-weight: 300; color: #ccc;">| Uformer</span></h1>
             <p>Real-time Enhancement</p>
         </div>
-        <div class="cache-info-block">
-            <label class="cache-line">
-                <input type="checkbox" id="clearImagesCheck" unchecked>
-                <span class="cache-label-text">Image Cache:</span>
-                <span class="cache-value" id="imageCacheValue">... MB</span>
-            </label>
-            <label class="cache-line">
-                <input type="checkbox" id="clearVideosCheck" unchecked>
-                <span class="cache-label-text">Video Cache:</span>
-                <span class="cache-value" id="videoCacheValue">... MB</span>
-            </label>
-            <button id="clearCacheBtn">Clear Selected</button>
+        <div class="controls-container">
+            <!-- Left Column: Cache Manager -->
+            <div class="control-column" style="min-width: 150px;">
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <label class="cache-line">
+                        <input type="checkbox" id="clearImagesCheck">
+                        <span class="cache-label-text">Image Cache:</span>
+                        <span class="cache-value" id="imageCacheValue">... MB</span>
+                    </label>
+                    <label class="cache-line">
+                        <input type="checkbox" id="clearVideosCheck">
+                        <span class="cache-label-text">Video Cache:</span>
+                        <span class="cache-value" id="videoCacheValue">... MB</span>
+                    </label>
+                </div>
+                <div style="display: flex; justify-content: center; width: 100%; margin-top: auto; padding-top: 5px;">
+                    <button id="clearCacheBtn">Clear Selected Cache</button>
+                </div>
+            </div>
+            <!-- Right Column: VRAM Manager -->
+            <div class="control-column" id="vramManagerBlock" style="min-width: 200px;">
+                 <div id="loadedModelsList"></div>
+                 <div class="button-row">
+                    <button id="clearSelectedModelsBtn" class="vram-button">Clear Selected</button>
+                    <button id="clearAllModelsBtn" class="vram-button">Clear All</button>
+                 </div>
+            </div>
         </div>
     </header>
     <div class="page-content">
@@ -83,9 +112,7 @@
             </div>
             <div class="control-group">
                 <label for="modelSelect">Enhancement Model</label>
-                <select id="modelSelect" style="padding: 8px; font-size: 1rem; border-radius: 4px; border: 1px solid #61dafb; background-color: #4a4f5a; color: white;">
-                    <!-- Options will be dynamically populated by JavaScript -->
-                </select>
+                <select id="modelSelect" style="padding: 8px; font-size: 1rem; border-radius: 4px; border: 1px solid #61dafb; background-color: #4a4f5a; color: white;"></select>
             </div>
             <div class="control-group checkbox-group">
                 <label><input type="checkbox" id="fpsCheckbox" checked> Show FPS Counter</label>
@@ -117,221 +144,261 @@
     </div>
 
     <script>
-        const startButton = document.getElementById('startButton');
-        const stopButton = document.getElementById('stopButton');
-        const webcamVideo = document.getElementById('webcam');
-        const processedImage = document.getElementById('processedImage');
-        const statusSpan = document.getElementById('status');
-        const taskSelect = document.getElementById('taskSelect');
-        const modelSelect = document.getElementById('modelSelect');
-        const fpsCheckbox = document.getElementById('fpsCheckbox');
-        const patchCheckbox = document.getElementById('patchCheckbox');
-        const patchWarning = document.getElementById('patchWarning');
-        // --- Cache Management ---
-        const clearCacheBtn = document.getElementById('clearCacheBtn');
-        const clearImagesCheck = document.getElementById('clearImagesCheck');
-        const clearVideosCheck = document.getElementById('clearVideosCheck');
-        const imageCacheValue = document.getElementById('imageCacheValue');
-        const videoCacheValue = document.getElementById('videoCacheValue');
-
-        let websocket;
-        let stream;
-        let isStreaming = false;
-        const WS_URL = "ws://127.0.0.1:8000/ws/process_video";
-
-        startButton.onclick = async () => {
-            try {
-                statusSpan.classList.remove('error');
-                stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                webcamVideo.srcObject = stream;
-                statusSpan.textContent = 'Webcam started.';
-                
-                websocket = new WebSocket(WS_URL);
-
-                websocket.onopen = () => {
-                    statusSpan.textContent = 'WebSocket Connected. Processing...';
-                    startButton.disabled = true;
-                    stopButton.disabled = false;
-                    isStreaming = true;
-                    requestAnimationFrame(processAndSendFrame); 
-                };
-
-                websocket.onmessage = (event) => {
-                    processedImage.src = event.data;
-                    if (isStreaming) {
-                        requestAnimationFrame(processAndSendFrame);
-                    }
-                };
-
-                websocket.onclose = () => {
-                    if (isStreaming) { statusSpan.textContent = 'WebSocket Disconnected.'; }
-                    stopStreaming();
-                };
-
-                websocket.onerror = (error) => {
-                    statusSpan.classList.add('error');
-                    statusSpan.textContent = !isStreaming ? 'Connection Failed. Is the backend running?' : 'WebSocket Error during stream.';
-                    console.error("WebSocket Error:", error);
-                    stopStreaming();
-                };
-            } catch (err) {
-                console.error("Error starting webcam:", err);
-                statusSpan.textContent = 'Error starting webcam!';
-            }
-        };
-
-        stopButton.onclick = () => {
-            statusSpan.classList.remove('error');
-            statusSpan.textContent = 'Idle. Press Start to begin.';
-            stopStreaming();
-        };
-
-        patchCheckbox.onchange = () => {
-            patchWarning.style.display = patchCheckbox.checked ? 'inline' : 'none';
-        };
-
-        function processAndSendFrame() {
-            if (!isStreaming || !websocket || websocket.readyState !== WebSocket.OPEN) {
-                return;
-            }
-            // Fix for race condition: wait for webcam to be ready.
-            if (!webcamVideo.videoWidth || !webcamVideo.videoHeight) {
-                requestAnimationFrame(processAndSendFrame); // Keep the loop alive
-                return; // And try again on the next frame
-            }
-
-            const canvas = document.createElement('canvas');
-            canvas.width = webcamVideo.videoWidth;
-            canvas.height = webcamVideo.videoHeight;
-            const context = canvas.getContext('2d');
-            
-            context.translate(canvas.width, 0);
-            context.scale(-1, 1);
-            context.drawImage(webcamVideo, 0, 0, canvas.width, canvas.height);
-            const dataUrl = canvas.toDataURL('image/jpeg');
-
-            const payload = {
-                image_b64: dataUrl,
-                task_type: taskSelect.value, // Add task type
-                model_name: modelSelect.value,
-                show_fps: fpsCheckbox.checked,
-                use_patch_processing: patchCheckbox.checked
-            };
-            websocket.send(JSON.stringify(payload));
-        }
-
-        function stopStreaming() {
-            isStreaming = false;
-            if (websocket) {
-                websocket.onclose = null; 
-                websocket.close();
-            }
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-                webcamVideo.srcObject = null;
-            }
-            startButton.disabled = false;
-            stopButton.disabled = true;
-            processedImage.src = "";
-        }
-
-        // --- Cache Management ---
-        async function updateCacheStatus() {
-            try {
-                const response = await fetch('http://127.0.0.1:8000/api/cache_status');
-                if (!response.ok) throw new Error("Server status check failed");
-                const data = await response.json();
-                imageCacheValue.textContent = `${data.image_cache_mb} MB`;
-                videoCacheValue.textContent = `${data.video_cache_mb} MB`;
-            } catch (error) {
-                console.error("Failed to fetch cache status:", error);
-                imageCacheValue.textContent = `Error`;
-                videoCacheValue.textContent = `Error`;
-            }
-        }
-
-        function toggleClearButtonState() {
-            if (!clearImagesCheck.checked && !clearVideosCheck.checked) {
-                clearCacheBtn.disabled = true;
-            } else {
-                clearCacheBtn.disabled = false;
-            }
-        }
-        
-        clearImagesCheck.addEventListener('change', toggleClearButtonState);
-        clearVideosCheck.addEventListener('change', toggleClearButtonState);
-        
-        clearCacheBtn.onclick = async () => {
-            const clearImages = clearImagesCheck.checked;
-            const clearVideos = clearVideosCheck.checked;
-            
-            const confirmationMessage = `Are you sure you want to clear the selected cache(s)?`;
-            if (!confirm(confirmationMessage)) {
-                return;
-            }
-
-            try {
-                const url = new URL('http://127.0.0.1:8000/api/clear_cache');
-                url.searchParams.append('clear_images', clearImages);
-                url.searchParams.append('clear_videos', clearVideos);
-
-                const response = await fetch(url, { method: 'POST' });
-                const result = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(result.detail || 'Failed to clear cache.');
-                }
-                
-                alert(result.message || 'Cache cleared successfully!');
-                await updateCacheStatus();
-            } catch (error) {
-                console.error("Cache clear error:", error);
-                alert(`An error occurred: ${error.message}`);
-            }
-        };
-
-        // --- Model and Task Management ---
-        const modelsByTask = {
-            denoise: [
-                { value: 'denoise_b', text: 'Uformer-B (High Quality)' },
-                { value: 'denoise_16', text: 'Uformer-16 (Fast)' }
-            ],
-            deblur: [
-                { value: 'deblur_b', text: 'Uformer-B (Deblur)' }
-            ]
-        };
-
-        function populateModelSelect(taskType) {
-            modelSelect.innerHTML = ''; // Clear existing options
-            const models = modelsByTask[taskType];
-            if (models) {
-                models.forEach(model => {
-                    const option = document.createElement('option');
-                    option.value = model.value;
-                    option.textContent = model.text;
-                    
-                    // Set 'Uformer-16 (Fast)' as default for 'denoise' task, or select the only option available
-                    if (taskType === 'denoise' && model.value === 'denoise_16') {
-                        option.selected = true;
-                    } else if (models.length === 1) { // If there's only one model for a task, select it
-                        option.selected = true;
-                    }
-
-                    modelSelect.appendChild(option);
-                });
-            }
-        }
-
-        // Event listener for task selection change
-        taskSelect.addEventListener('change', (event) => {
-            populateModelSelect(event.target.value);
-        });
-
-        // Initial load
         document.addEventListener('DOMContentLoaded', () => {
+            // --- Element References ---
+            const startButton = document.getElementById('startButton');
+            const stopButton = document.getElementById('stopButton');
+            const webcamVideo = document.getElementById('webcam');
+            const processedImage = document.getElementById('processedImage');
+            const statusSpan = document.getElementById('status');
+            const taskSelect = document.getElementById('taskSelect');
+            const modelSelect = document.getElementById('modelSelect');
+            const fpsCheckbox = document.getElementById('fpsCheckbox');
+            const patchCheckbox = document.getElementById('patchCheckbox');
+            const patchWarning = document.getElementById('patchWarning');
+            
+            // --- Cache Management Elements ---
+            const clearCacheBtn = document.getElementById('clearCacheBtn');
+            const clearImagesCheck = document.getElementById('clearImagesCheck');
+            const clearVideosCheck = document.getElementById('clearVideosCheck');
+            const imageCacheValue = document.getElementById('imageCacheValue');
+            const videoCacheValue = document.getElementById('videoCacheValue');
+            
+            // --- VRAM Management Elements ---
+            const vramManagerBlock = document.getElementById('vramManagerBlock');
+            const loadedModelsList = document.getElementById('loadedModelsList');
+            const clearSelectedModelsBtn = document.getElementById('clearSelectedModelsBtn');
+            const clearAllModelsBtn = document.getElementById('clearAllModelsBtn');
+
+            // --- State Variables ---
+            let websocket;
+            let stream;
+            let isStreaming = false;
+            let modelStatusInterval = null;
+            let selectedModelsToClear = new Set();
+            const WS_URL = "ws://127.0.0.1:8000/ws/process_video";
+
+            // --- Live Stream Logic ---
+            const stopStreaming = () => {
+                if (modelStatusInterval) {
+                    clearInterval(modelStatusInterval);
+                    modelStatusInterval = null;
+                }
+                isStreaming = false;
+                if (websocket) {
+                    websocket.onclose = null; 
+                    websocket.close();
+                }
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                    webcamVideo.srcObject = null;
+                }
+                startButton.disabled = false;
+                stopButton.disabled = true;
+                processedImage.src = "";
+                updateLoadedModelsStatus(); // Final status update
+            };
+
+            const processAndSendFrame = () => {
+                if (!isStreaming || !websocket || websocket.readyState !== WebSocket.OPEN) return;
+                if (!webcamVideo.videoWidth || !webcamVideo.videoHeight) {
+                    requestAnimationFrame(processAndSendFrame);
+                    return;
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = webcamVideo.videoWidth;
+                canvas.height = webcamVideo.videoHeight;
+                const context = canvas.getContext('2d');
+                context.drawImage(webcamVideo, 0, 0, canvas.width, canvas.height);
+                const dataUrl = canvas.toDataURL('image/jpeg');
+                const payload = {
+                    image_b64: dataUrl, task_type: taskSelect.value, model_name: modelSelect.value,
+                    show_fps: fpsCheckbox.checked, use_patch_processing: patchCheckbox.checked
+                };
+                websocket.send(JSON.stringify(payload));
+            };
+
+            startButton.onclick = async () => {
+                try {
+                    statusSpan.classList.remove('error');
+                    stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    webcamVideo.srcObject = stream;
+                    statusSpan.textContent = 'Webcam started.';
+                    websocket = new WebSocket(WS_URL);
+                    websocket.onopen = () => {
+                        statusSpan.textContent = 'WebSocket Connected. Processing...';
+                        startButton.disabled = true;
+                        stopButton.disabled = false;
+                        isStreaming = true;
+                        requestAnimationFrame(processAndSendFrame);
+                        if (modelStatusInterval) clearInterval(modelStatusInterval);
+                        modelStatusInterval = setInterval(updateLoadedModelsStatus, 2000);
+                    };
+                    websocket.onmessage = (event) => {
+                        processedImage.src = event.data;
+                        if (isStreaming) requestAnimationFrame(processAndSendFrame);
+                    };
+                    websocket.onclose = () => {
+                        if (isStreaming) statusSpan.textContent = 'WebSocket Disconnected.';
+                        stopStreaming();
+                    };
+                    websocket.onerror = () => {
+                        statusSpan.classList.add('error');
+                        statusSpan.textContent = !isStreaming ? 'Connection Failed. Is the backend running?' : 'WebSocket Error during stream.';
+                        stopStreaming();
+                    };
+                } catch (err) {
+                    statusSpan.textContent = 'Error starting webcam!';
+                }
+            };
+            stopButton.onclick = () => {
+                statusSpan.classList.remove('error');
+                statusSpan.textContent = 'Idle. Press Start to begin.';
+                stopStreaming();
+            };
+
+            // --- VRAM Management Logic ---
+            const checkModelLoadingStrategy = async () => {
+                try {
+                    const response = await fetch('http://127.0.0.1:8000/api/model_loading_strategy');
+                    const data = await response.json();
+                    if (!data.load_all_on_startup) {
+                        vramManagerBlock.style.display = 'flex';
+                        updateLoadedModelsStatus();
+                    }
+                } catch (error) {
+                    console.error("Could not fetch model loading strategy:", error);
+                }
+            };
+            
+            const renderLoadedModels = (models) => {
+                loadedModelsList.innerHTML = '';
+                let anyModelLoaded = false;
+                models.forEach(model => {
+                    if (model.loaded) anyModelLoaded = true;
+                    if (!model.loaded && selectedModelsToClear.has(model.name)) {
+                        selectedModelsToClear.delete(model.name);
+                    }
+                    const isChecked = selectedModelsToClear.has(model.name);
+                    const label = document.createElement('label');
+                    label.className = 'cache-line';
+                    label.style.fontSize = '0.85rem';
+                    label.innerHTML = `
+                        <input type="checkbox" ${model.loaded ? '' : 'disabled'} ${isChecked ? 'checked' : ''} data-model-name="${model.name}">
+                        <span class="cache-label-text" style="margin-left: 8px;">${model.name}</span>
+                        <span style="color: ${model.loaded ? '#86e58b' : '#ff7a7a'}; font-weight: bold; min-width: 65px; text-align: right; margin-left: auto;">
+                            ${model.loaded ? 'Loaded' : 'Unloaded'}
+                        </span>`;
+                    label.querySelector('input').onchange = (e) => {
+                        const name = e.target.dataset.modelName;
+                        if (e.target.checked) selectedModelsToClear.add(name);
+                        else selectedModelsToClear.delete(name);
+                        toggleVramButtons();
+                    };
+                    loadedModelsList.appendChild(label);
+                });
+                clearAllModelsBtn.disabled = !anyModelLoaded;
+                toggleVramButtons();
+            };
+
+            const updateLoadedModelsStatus = async () => {
+                try {
+                    const response = await fetch('http://127.0.0.1:8000/api/loaded_models_status');
+                    const data = await response.json();
+                    renderLoadedModels(data.models || []);
+                } catch (error) {
+                    console.error("Failed to fetch loaded models status:", error);
+                }
+            };
+
+            const toggleVramButtons = () => {
+                clearSelectedModelsBtn.disabled = selectedModelsToClear.size === 0;
+            };
+
+            const handleClearModels = async (modelsToClear = []) => {
+                const isClearingAll = modelsToClear.length === 0;
+                const modelListStr = Array.from(modelsToClear).join(', ');
+                const confirmMsg = isClearingAll ? "Unload ALL models?" : `Unload ${modelListStr}?`;
+                if (!confirm(confirmMsg)) return;
+                try {
+                    const response = await fetch('http://127.0.0.1:8000/api/unload_models', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ model_names: modelsToClear })
+                    });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.detail);
+                    alert(result.message);
+                    await updateLoadedModelsStatus();
+                } catch (error) {
+                    alert(`Error unloading models: ${error.message}`);
+                }
+            };
+            clearSelectedModelsBtn.onclick = () => handleClearModels(Array.from(selectedModelsToClear));
+            clearAllModelsBtn.onclick = () => handleClearModels([]);
+
+            // --- Cache Management Logic ---
+            const updateCacheStatus = async () => {
+                try {
+                    const response = await fetch('http://127.0.0.1:8000/api/cache_status');
+                    const data = await response.json();
+                    imageCacheValue.textContent = `${data.image_cache_mb} MB`;
+                    videoCacheValue.textContent = `${data.video_cache_mb} MB`;
+                } catch (error) {
+                    imageCacheValue.textContent = `Error`; videoCacheValue.textContent = `Error`;
+                }
+            };
+            const toggleClearCacheButtonState = () => {
+                clearCacheBtn.disabled = !clearImagesCheck.checked && !clearVideosCheck.checked;
+            };
+            clearImagesCheck.addEventListener('change', toggleClearCacheButtonState);
+            clearVideosCheck.addEventListener('change', toggleClearCacheButtonState);
+            clearCacheBtn.onclick = async () => {
+                if (!confirm(`Are you sure you want to clear the selected cache(s)?`)) return;
+                try {
+                    const url = new URL('http://127.0.0.1:8000/api/clear_cache');
+                    url.searchParams.append('clear_images', clearImagesCheck.checked);
+                    url.searchParams.append('clear_videos', clearVideosCheck.checked);
+                    const response = await fetch(url, { method: 'POST' });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.detail);
+                    alert(result.message);
+                    clearImagesCheck.checked = false;
+                    clearVideosCheck.checked = false;
+                    toggleClearCacheButtonState();
+                    await updateCacheStatus();
+                } catch (error) {
+                    alert(`An error occurred: ${error.message}`);
+                }
+            };
+
+            // --- Model and Task Management ---
+            const modelsByTask = {
+                denoise: [{ value: 'denoise_b', text: 'Uformer-B (High Quality)' }, { value: 'denoise_16', text: 'Uformer-16 (Fast)' }],
+                deblur: [{ value: 'deblur_b', text: 'Uformer-B (Deblur)' }]
+            };
+            const populateModelSelect = (taskType) => {
+                modelSelect.innerHTML = '';
+                const models = modelsByTask[taskType];
+                if (models) {
+                    models.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model.value;
+                        option.textContent = model.text;
+                        if (taskType === 'denoise' && model.value === 'denoise_16') option.selected = true;
+                        else if (models.length === 1) option.selected = true;
+                        modelSelect.appendChild(option);
+                    });
+                }
+            };
+            taskSelect.addEventListener('change', (e) => populateModelSelect(e.target.value));
+            patchCheckbox.onchange = () => { patchWarning.style.display = patchCheckbox.checked ? 'inline' : 'none'; };
+
+            // --- Initial Page Load ---
             updateCacheStatus();
-            toggleClearButtonState(); // Set initial button state on page load
-            populateModelSelect(taskSelect.value); // Populate models based on initial task selection
+            toggleClearCacheButtonState();
+            populateModelSelect(taskSelect.value);
+            checkModelLoadingStrategy();
         });
     </script>
 </body>
