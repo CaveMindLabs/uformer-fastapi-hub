@@ -50,9 +50,8 @@ const CacheManager = () => {
     };
 
     return (
-        // The main container no longer uses 'alignItems: flex-end'.
-        // This allows its children to stretch to the full width.
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minWidth: '150px' }}>
+        // This container is now a flex column that will stretch to fill vertical space
+        <div style={{ display: 'flex', flexDirection: 'column', minWidth: '150px' }}>
             <style jsx>{`
                 /* This rule targets the button by its ID, but only when it is NOT disabled. */
                 #clearCacheBtn:not(:disabled):hover {
@@ -60,25 +59,29 @@ const CacheManager = () => {
                     border-color: #d04242;
                 }
             `}</style>
-            <label className="cache-line">
-                <input type="checkbox" checked={clearImages} onChange={(e) => setClearImages(e.target.checked)} />
-                <span className="cache-label-text">Image Cache:</span>
-                <span className="cache-value">{imageCacheMb} MB</span>
-            </label>
-            <label className="cache-line">
-                <input type="checkbox" checked={clearVideos} onChange={(e) => setClearVideos(e.target.checked)} />
-                <span className="cache-label-text">Video Cache:</span>
-                <span className="cache-value">{videoCacheMb} MB</span>
-            </label>
+            
+            {/* A wrapper for the top content (checkboxes) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                <label className="cache-line">
+                    <input type="checkbox" checked={clearImages} onChange={(e) => setClearImages(e.target.checked)} />
+                    <span className="cache-label-text">Image Cache:</span>
+                    <span className="cache-value">{imageCacheMb} MB</span>
+                </label>
+                <label className="cache-line">
+                    <input type="checkbox" checked={clearVideos} onChange={(e) => setClearVideos(e.target.checked)} />
+                    <span className="cache-label-text">Video Cache:</span>
+                    <span className="cache-value">{videoCacheMb} MB</span>
+                </label>
+            </div>
 
-            {/* A new wrapper div to center the button */}
-            <div style={{ display: 'flex', justifyContent: 'center', width: '100%', marginTop: '5px' }}>
+            {/* The button wrapper, now pushed to the bottom and centered */}
+            <div style={{ display: 'flex', justifyContent: 'center', width: '100%', marginTop: 'auto', paddingTop: '5px' }}>
                 <button
                     id="clearCacheBtn"
                     onClick={handleClear}
                     disabled={!clearImages && !clearVideos}
                 >
-                    Clear Selected
+                    Clear Selected Cache
                 </button>
             </div>
         </div>
@@ -334,7 +337,7 @@ const LiveStreamPage = () => {
                     <p>Real-time Enhancement</p>
                 </div>
                 {/* Main container for both cache and VRAM controls, set to display row */}
-                <div className="cache-info-block" style={{ flexDirection: 'row', gap: '20px', alignItems: 'flex-start', width: 'auto' }}>
+                <div className="cache-info-block" style={{ flexDirection: 'row', gap: '20px', alignItems: 'stretch', width: 'auto' }}>
                     {/* Left Column for general cache management (now a self-contained component) */}
                     <CacheManager />
                     {/* Right Column for VRAM Management (model loading/unloading) */}
