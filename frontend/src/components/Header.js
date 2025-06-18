@@ -10,27 +10,48 @@ const Header = ({ activePage, pageTitle, defaultClearImages, defaultClearVideos 
     const [loadedModels, setLoadedModels] = useState([]);
     const [isVramControlVisible, setIsVramControlVisible] = useState(false);
     const [selectedModelsToClear, setSelectedModelsToClear] = useState(new Set());
+    const vramErrorStateRef = useRef(false); // Ref to track error state for VRAM status
 
     const updateLoadedModelsStatus = useCallback(async () => {
         try {
             const response = await fetch('http://127.0.0.1:8000/api/loaded_models_status');
             if (!response.ok) throw new Error("Failed to fetch loaded models status.");
             const data = await response.json();
-            setLoadedModels(data.models || []);
+            
+            // On successful fetch, reset the error state.
+            if (vramErrorStateRef.current) {
+                vramErrorStateRef.current = false;
+            }
+
+            setLoadedModels(prevModels => {
+                // Prevent re-render if the model data is identical to avoid flicker.
+                if (JSON.stringify(prevModels) === JSON.stringify(data.models || [])) {
+                    return prevModels;
+                }
+                return data.models || [];
+            });
+
+            // Clean up 'selected to clear' models if they become unloaded by other means
             setSelectedModelsToClear(prev => {
                 const newSet = new Set(prev);
+                let changed = false;
                 (data.models || []).forEach(model => {
                     if (!model.loaded && newSet.has(model.name)) {
                         newSet.delete(model.name);
+                        changed = true;
                     }
                 });
-                return newSet;
+                return changed ? newSet : prev;
             });
         } catch (error) {
-            console.error("Failed to fetch loaded models status:", error);
-            setLoadedModels([]);
+            // Only log the error and update state once to prevent console spam and UI flicker.
+            if (!vramErrorStateRef.current) {
+                console.error("Failed to fetch loaded models status (backend may be down):", error);
+                vramErrorStateRef.current = true; // Set error state
+                setLoadedModels([]); // Set to empty on error
+            }
         }
-    }, []);
+    }, []); // No dependencies, as we use functional updates and refs
 
     // We need to get the update function for the cache from the CacheManager
     const cacheManagerRef = useRef(null);
@@ -75,35 +96,45 @@ const Header = ({ activePage, pageTitle, defaultClearImages, defaultClearVideos 
     }, [updateLoadedModelsStatus]);
 
     // The CacheManager is now passed a ref so the Header can call its update function.
-    // This is a more advanced but correct React pattern for this situation.
     const CacheManager = React.forwardRef(({ defaultClearImages, defaultClearVideos }, ref) => {
         const [imageCacheMb, setImageCacheMb] = useState('...');
         const [videoCacheMb, setVideoCacheMb] = useState('...');
         const [clearImages, setClearImages] = useState(defaultClearImages);
         const [clearVideos, setClearVideos] = useState(defaultClearVideos);
+        const cacheErrorStateRef = useRef(false); // Ref to track error state for cache status
 
         const updateStatus = useCallback(async () => {
             try {
                 const response = await fetch('http://127.0.0.1:8000/api/cache_status');
                 if (!response.ok) throw new Error("Failed to fetch cache status");
                 const data = await response.json();
-                setImageCacheMb(data.image_cache_mb);
-                setVideoCacheMb(data.video_cache_mb);
-            } catch (error) {
-                console.error(error);
-                setImageCacheMb('Error');
-                setVideoCacheMb('Error');
-            }
-        }, []);
 
-        // Expose the updateStatus function via the ref.
+                // On successful fetch, reset the error state.
+                if (cacheErrorStateRef.current) {
+                    cacheErrorStateRef.current = false;
+                }
+                
+                // Use functional updates to prevent re-renders if the value hasn't changed.
+                setImageCacheMb(prevMb => prevMb !== data.image_cache_mb ? data.image_cache_mb : prevMb);
+                setVideoCacheMb(prevMb => prevMb !== data.video_cache_mb ? data.video_cache_mb : prevMb);
+
+            } catch (error) {
+                // Only log the error and set UI to "Error" once to prevent console spam.
+                if (!cacheErrorStateRef.current) {
+                    console.error("Failed to fetch cache status (backend may be down):", error);
+                    cacheErrorStateRef.current = true; // Set error state
+                    setImageCacheMb('Error');
+                    setVideoCacheMb('Error');
+                }
+            }
+        }, []); // Empty dependencies, functional updates are used.
+
+        // Expose the updateStatus function via the ref for the parent component to call.
         React.useImperativeHandle(ref, () => ({
             updateStatus
         }));
 
-        useEffect(() => {
-            updateStatus();
-        }, [updateStatus]);
+        // The useEffect hook for updates is no longer needed here; the parent's polling loop controls all updates.
 
         const handleClear = async () => {
             if (!confirm(`Are you sure you want to clear the selected cache(s)?`)) return;
