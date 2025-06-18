@@ -2,10 +2,26 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 
-// This component is defined inside the Header component below, using forwardRef.
-// The definition here was a duplicate and has been removed for clarity.
+// Memoized static components to prevent re-rendering when the parent state changes.
+const NavBar = React.memo(({ activePage }) => (
+    <div className="nav-bar">
+        <Link href="/" className={`nav-button ${activePage === 'live' ? 'active' : ''}`}>Live Stream</Link>
+        <Link href="/video-processor" className={`nav-button ${activePage === 'video' ? 'active' : ''}`}>Video File</Link>
+        <Link href="/image-processor" className={`nav-button ${activePage === 'image' ? 'active' : ''}`}>Image File</Link>
+    </div>
+));
+NavBar.displayName = 'NavBar';
 
-// The CacheManager is now passed a ref so the Header can call its update function.
+const TitleBlock = React.memo(({ pageTitle }) => (
+    <div className="title-block">
+        <h1>🦉 NocturaVision <span style={{ fontWeight: 300, color: '#ccc' }}>| Uformer</span></h1>
+        <p>{pageTitle}</p>
+    </div>
+));
+TitleBlock.displayName = 'TitleBlock';
+
+
+// The CacheManager component is now internal to the Header
 const CacheManager = React.forwardRef(({ defaultClearImages, defaultClearVideos }, ref) => {
     const [imageCacheMb, setImageCacheMb] = useState('...');
     const [videoCacheMb, setVideoCacheMb] = useState('...');
@@ -16,7 +32,7 @@ const CacheManager = React.forwardRef(({ defaultClearImages, defaultClearVideos 
     const updateStatus = useCallback(async () => {
         try {
             const response = await fetch('http://127.0.0.1:8000/api/cache_status');
-            if (!response.ok) throw new Error("Failed to fetch cache status");
+            if (!response.ok) throw new Error(`Server returned status ${response.status}`);
             const data = await response.json();
 
             // On successful fetch, reset the error state.
@@ -106,7 +122,7 @@ const VRAMManager = () => {
     const updateLoadedModelsStatus = useCallback(async () => {
         try {
             const response = await fetch('http://127.0.0.1:8000/api/loaded_models_status');
-            if (!response.ok) throw new Error("Failed to fetch loaded models status.");
+            if (!response.ok) throw new Error(`Server returned status ${response.status}`);
             const data = await response.json();
 
             if (vramErrorStateRef.current) vramErrorStateRef.current = false;
@@ -252,15 +268,8 @@ const Header = ({ activePage, pageTitle, defaultClearImages, defaultClearVideos 
 
     return (
         <header>
-            <div className="nav-bar">
-                <Link href="/" className={`nav-button ${activePage === 'live' ? 'active' : ''}`}>Live Stream</Link>
-                <Link href="/video-processor" className={`nav-button ${activePage === 'video' ? 'active' : ''}`}>Video File</Link>
-                <Link href="/image-processor" className={`nav-button ${activePage === 'image' ? 'active' : ''}`}>Image File</Link>
-            </div>
-            <div className="title-block">
-                <h1>🦉 NocturaVision <span style={{ fontWeight: 300, color: '#ccc' }}>| Uformer</span></h1>
-                <p>{pageTitle}</p>
-            </div>
+            <NavBar activePage={activePage} />
+            <TitleBlock pageTitle={pageTitle} />
             <div className="cache-info-block" style={{ flexDirection: 'row', gap: '20px', alignItems: 'stretch', width: 'auto' }}>
                 <CacheManager 
                     ref={cacheManagerRef} // ref is kept for potential direct calls if needed in future
