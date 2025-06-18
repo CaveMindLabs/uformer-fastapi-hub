@@ -73,24 +73,26 @@ async def generate_preview(image_file: UploadFile = File(...)):
         print(f"Error generating preview: {e}")
         raise HTTPException(status_code=500, detail="Could not generate preview from file.")
 
+      
 @router.post("/api/process_image")
 async def process_image(
     image_file: UploadFile = File(...),
     task_type: str = Form("denoise"),
     model_name: str = Form("denoise_b"),
     use_patch_processing: bool = Form(True),
-    uformer_model: torch.nn.Module = Depends(get_model_by_name) # Use the new dependency
+    models: Dict[str, Any] = Depends(get_models) # Inject the models container instead
 ):
     """
     Accepts an image file, processes it using the selected Uformer model and task, 
     and returns the enhanced image. Saves files into task-specific subdirectories.
     """
-    # 'uformer_model' is now directly injected, already loaded or freshly loaded
-    # 'models' dict (from get_models) is NOT needed here anymore
-    device = uformer_model.device # Get device directly from the model instance
-    patch_size = 256
-
     try:
+        # Manually get the model using the model_name from the form.
+        uformer_model = get_model_by_name(model_name=model_name, models=models)
+        # Correctly get the device from the main models container, not the model instance.
+        device = models["device"]
+        patch_size = 256
+
         print(f"--- [IMAGE_PROCESSOR] New Job for: {image_file.filename} (Task: {task_type}) ---")
         contents = await image_file.read()
 

@@ -1,77 +1,9 @@
 /* frontend/src/components/Header.js */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 
-// The CacheManager component is now internal to the Header
-const CacheManager = ({ defaultClearImages, defaultClearVideos }) => {
-    const [imageCacheMb, setImageCacheMb] = useState('...');
-    const [videoCacheMb, setVideoCacheMb] = useState('...');
-    // The state is now initialized from props
-    const [clearImages, setClearImages] = useState(defaultClearImages);
-    const [clearVideos, setClearVideos] = useState(defaultClearVideos);
-
-    const updateStatus = useCallback(async () => {
-        try {
-            const response = await fetch('http://127.0.0.1:8000/api/cache_status');
-            if (!response.ok) throw new Error("Failed to fetch cache status");
-            const data = await response.json();
-            setImageCacheMb(data.image_cache_mb);
-            setVideoCacheMb(data.video_cache_mb);
-        } catch (error) {
-            console.error(error);
-            setImageCacheMb('Error');
-            setVideoCacheMb('Error');
-        }
-    }, []);
-
-    useEffect(() => {
-        updateStatus();
-    }, [updateStatus]);
-
-    const handleClear = async () => {
-        if (!confirm(`Are you sure you want to clear the selected cache(s)?`)) return;
-        try {
-            const url = new URL('http://127.0.0.1:8000/api/clear_cache');
-            url.searchParams.append('clear_images', clearImages);
-            url.searchParams.append('clear_videos', clearVideos);
-            const response = await fetch(url, { method: 'POST' });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.detail || 'Failed to clear cache.');
-            alert(result.message || 'Cache cleared successfully!');
-            await updateStatus();
-        } catch (error) {
-            alert(`An error occurred: ${error.message}`);
-        }
-    };
-
-    return (
-        <div style={{ display: 'flex', flexDirection: 'column', minWidth: '150px' }}>
-            <style jsx>{`
-                #clearCacheBtn:not(:disabled):hover {
-                    background-color: #e05252;
-                    border-color: #d04242;
-                }
-            `}</style>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                <label className="cache-line">
-                    <input type="checkbox" checked={clearImages} onChange={(e) => setClearImages(e.target.checked)} />
-                    <span className="cache-label-text">Image Cache:</span>
-                    <span className="cache-value">{imageCacheMb} MB</span>
-                </label>
-                <label className="cache-line">
-                    <input type="checkbox" checked={clearVideos} onChange={(e) => setClearVideos(e.target.checked)} />
-                    <span className="cache-label-text">Video Cache:</span>
-                    <span className="cache-value">{videoCacheMb} MB</span>
-                </label>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'center', width: '100%', marginTop: 'auto', paddingTop: '5px' }}>
-                <button id="clearCacheBtn" onClick={handleClear} disabled={!clearImages && !clearVideos}>
-                    Clear Selected Cache
-                </button>
-            </div>
-        </div>
-    );
-};
+// This component is defined inside the Header component below, using forwardRef.
+// The definition here was a duplicate and has been removed for clarity.
 
 // The main Header component
 const Header = ({ activePage, pageTitle, defaultClearImages, defaultClearVideos }) => {
@@ -100,6 +32,10 @@ const Header = ({ activePage, pageTitle, defaultClearImages, defaultClearVideos 
         }
     }, []);
 
+    // We need to get the update function for the cache from the CacheManager
+    const cacheManagerRef = useRef(null);
+
+    // This useEffect hook sets up polling and a listener for state updates.
     useEffect(() => {
         async function checkModelLoadingStrategy() {
             try {
@@ -112,15 +48,108 @@ const Header = ({ activePage, pageTitle, defaultClearImages, defaultClearVideos 
                 setIsVramControlVisible(false);
             }
         }
-        checkModelLoadingStrategy();
-        updateLoadedModelsStatus();
 
-        // We can poll here if needed, or rely on page-level logic to trigger updates.
-        // For now, it updates on mount.
-        const interval = setInterval(updateLoadedModelsStatus, 5000); // Poll every 5 seconds
-        return () => clearInterval(interval);
+        const handleForceUpdate = () => {
+            // This function updates both VRAM and Cache status.
+            updateLoadedModelsStatus();
+            if (cacheManagerRef.current) {
+                cacheManagerRef.current.updateStatus();
+            }
+        };
+
+        // For immediate updates triggered by page actions (e.g., after processing).
+        window.addEventListener('forceHeaderUpdate', handleForceUpdate);
+
+        // For consistent, background/cross-tab updates.
+        const pollInterval = setInterval(handleForceUpdate, 2000);
+
+        checkModelLoadingStrategy();
+        handleForceUpdate(); // Initial update on mount
+
+        // Cleanup function to run when the component unmounts.
+        return () => {
+            window.removeEventListener('forceHeaderUpdate', handleForceUpdate);
+            clearInterval(pollInterval);
+        };
 
     }, [updateLoadedModelsStatus]);
+
+    // The CacheManager is now passed a ref so the Header can call its update function.
+    // This is a more advanced but correct React pattern for this situation.
+    const CacheManager = React.forwardRef(({ defaultClearImages, defaultClearVideos }, ref) => {
+        const [imageCacheMb, setImageCacheMb] = useState('...');
+        const [videoCacheMb, setVideoCacheMb] = useState('...');
+        const [clearImages, setClearImages] = useState(defaultClearImages);
+        const [clearVideos, setClearVideos] = useState(defaultClearVideos);
+
+        const updateStatus = useCallback(async () => {
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/cache_status');
+                if (!response.ok) throw new Error("Failed to fetch cache status");
+                const data = await response.json();
+                setImageCacheMb(data.image_cache_mb);
+                setVideoCacheMb(data.video_cache_mb);
+            } catch (error) {
+                console.error(error);
+                setImageCacheMb('Error');
+                setVideoCacheMb('Error');
+            }
+        }, []);
+
+        // Expose the updateStatus function via the ref.
+        React.useImperativeHandle(ref, () => ({
+            updateStatus
+        }));
+
+        useEffect(() => {
+            updateStatus();
+        }, [updateStatus]);
+
+        const handleClear = async () => {
+            if (!confirm(`Are you sure you want to clear the selected cache(s)?`)) return;
+            try {
+                const url = new URL('http://127.0.0.1:8000/api/clear_cache');
+                url.searchParams.append('clear_images', clearImages);
+                url.searchParams.append('clear_videos', clearVideos);
+                const response = await fetch(url, { method: 'POST' });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.detail || 'Failed to clear cache.');
+                alert(result.message || 'Cache cleared successfully!');
+                await updateStatus();
+            } catch (error) {
+                alert(`An error occurred: ${error.message}`);
+            }
+        };
+
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: '150px' }}>
+                <style jsx>{`
+                    #clearCacheBtn:not(:disabled):hover {
+                        background-color: #e05252;
+                        border-color: #d04242;
+                    }
+                `}</style>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <label className="cache-line">
+                        <input type="checkbox" checked={clearImages} onChange={(e) => setClearImages(e.target.checked)} />
+                        <span className="cache-label-text">Image Cache:</span>
+                        <span className="cache-value">{imageCacheMb} MB</span>
+                    </label>
+                    <label className="cache-line">
+                        <input type="checkbox" checked={clearVideos} onChange={(e) => setClearVideos(e.target.checked)} />
+                        <span className="cache-label-text">Video Cache:</span>
+                        <span className="cache-value">{videoCacheMb} MB</span>
+                    </label>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'center', width: '100%', marginTop: 'auto', paddingTop: '5px' }}>
+                    <button id="clearCacheBtn" onClick={handleClear} disabled={!clearImages && !clearVideos}>
+                        Clear Selected Cache
+                    </button>
+                </div>
+            </div>
+        );
+    });
+    CacheManager.displayName = 'CacheManager'; // for better debugging
 
     const handleModelSelectionChange = (modelName) => {
         setSelectedModelsToClear(prev => {
@@ -169,6 +198,7 @@ const Header = ({ activePage, pageTitle, defaultClearImages, defaultClearVideos 
             </div>
             <div className="cache-info-block" style={{ flexDirection: 'row', gap: '20px', alignItems: 'stretch', width: 'auto' }}>
                 <CacheManager 
+                    ref={cacheManagerRef}
                     defaultClearImages={defaultClearImages} 
                     defaultClearVideos={defaultClearVideos} 
                 />

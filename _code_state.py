@@ -12,59 +12,57 @@ logger = logging.getLogger(__name__)
 # _get_code_state.py
 # (This is the content for the FILES_TO_EXTRACT list within _code_state.py)
 
-FILES_TO_EXTRACT = [
-    # --- Project Root Setup ---
-    ".gitignore", # Include root .gitignore to show overall ignored files
-    "_useful_commands.md",
-    "README.md",
-    "_code_state.py", # Script for generating this state file
-
-    # --- FastAPI Backend Application ---
-    "backend/Pipfile", # Now located in backend/
-    # "backend/Pipfile.lock", # Now located in backend/
-    "backend/.env.example", # New file for environment variables
-    # "backend/Dockerfile", # New Dockerfile for backend service
-    "backend/app/main.py",
-    "backend/app/api/dependencies.py",
-    "backend/app/api/endpoints/cache_management.py",
-    "backend/app/api/endpoints/image_file_processing.py",
-    "backend/app/api/endpoints/live_stream_processing.py",
-    "backend/app/api/endpoints/video_file_processing.py",
-
-    # --- Core Uformer Model Code (for inference) ---
-    "backend/uformer_model/model.py",
-    "backend/uformer_model/utils/image_utils.py",
-    # "backend/uformer_model/utils/__init__.py",
-
-    # --- Original HTML User Interfaces (retained for debugging) ---
-    "backend/image_processor.html",
-    "backend/video_processor.html",
-    "backend/wstest_uformer.html",
-
-    # --- Next.js Frontend Application ---
-    "frontend/.gitignore", # Frontend specific .gitignore
-    "frontend/README.md", # Frontend specific README.md
-    # "frontend/package.json",
-    # "frontend/package-lock.json",
-    # "frontend/next.config.mjs",
-    # "frontend/jsconfig.json",
-    # "frontend/eslint.config.mjs",
-    "frontend/src/styles/globals.css",
-    "frontend/src/pages/_app.js",
-    # "frontend/src/pages/_document.js",
-    "frontend/src/pages/index.js", # Live Stream page
-    "frontend/src/pages/image-processor.js", # Image File page
-    "frontend/src/pages/video-processor.js", # Video File page
-]
-
 # FILES_TO_EXTRACT = [
-#     "frontend/src/pages/image-processor.js",
-#     "backend/app/api/endpoints/image_file_processing.py",
-#     "backend/app/api/endpoints/live_stream_processing.py",
-#     "backend/app/api/endpoints/cache_management.py",
+#     # --- Project Root Setup ---
+#     ".gitignore", # Include root .gitignore to show overall ignored files
+#     "_useful_commands.md",
+#     "README.md",
+#     "_code_state.py", # Script for generating this state file
+
+#     # --- FastAPI Backend Application ---
+#     "backend/Pipfile", # Now located in backend/
+#     # "backend/Pipfile.lock", # Now located in backend/
+#     "backend/.env.example", # New file for environment variables
+#     # "backend/Dockerfile", # New Dockerfile for backend service
 #     "backend/app/main.py",
 #     "backend/app/api/dependencies.py",
+#     "backend/app/api/endpoints/cache_management.py",
+#     "backend/app/api/endpoints/image_file_processing.py",
+#     "backend/app/api/endpoints/live_stream_processing.py",
+#     "backend/app/api/endpoints/video_file_processing.py",
+
+#     # --- Core Uformer Model Code (for inference) ---
+#     "backend/uformer_model/model.py",
+#     "backend/uformer_model/utils/image_utils.py",
+#     # "backend/uformer_model/utils/__init__.py",
+
+#     # --- Original HTML User Interfaces (retained for debugging) ---
+#     "backend/image_processor.html",
+#     "backend/video_processor.html",
+#     "backend/wstest_uformer.html",
+
+#     # --- Next.js Frontend Application ---
+#     "frontend/.gitignore", # Frontend specific .gitignore
+#     "frontend/README.md", # Frontend specific README.md
+#     # "frontend/package.json",
+#     # "frontend/package-lock.json",
+#     # "frontend/next.config.mjs",
+#     # "frontend/jsconfig.json",
+#     # "frontend/eslint.config.mjs",
+#     "frontend/src/styles/globals.css",
+#     "frontend/src/pages/_app.js",
+#     # "frontend/src/pages/_document.js",
+#     "frontend/src/pages/index.js", # Live Stream page
+#     "frontend/src/pages/image-processor.js", # Image File page
+#     "frontend/src/pages/video-processor.js", # Video File page
 # ]
+
+FILES_TO_EXTRACT = [
+    "frontend/src/components/Header.js",
+    "frontend/src/pages/index.js",
+    "frontend/src/pages/image-processor.js",
+    "frontend/src/pages/video-processor.js",
+]
 
 MARKDOWN_OUTPUT = []
 
