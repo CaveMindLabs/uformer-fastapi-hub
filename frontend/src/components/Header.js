@@ -196,8 +196,21 @@ const VRAMManager = React.forwardRef((props, ref) => {
         }
     };
 
-    if (!isVramControlVisible) return null;
+    if (!isVramControlVisible) {
+        // When the component is not visible, it's better to render nothing.
+        // If there was an error fetching the strategy, the model list will be empty anyway.
+        return null;
+    }
 
+    // If we are in an error state (e.g., backend is down), show a user-friendly message.
+    if (vramErrorStateRef.current && loadedModels.length === 0) {
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minWidth: '200px', color: '#ccc', fontSize: '0.85rem', alignItems: 'center', justifyContent: 'center' }}>
+                VRAM status unknown
+            </div>
+        );
+    }
+    
     const isAnyModelLoaded = loadedModels.some(m => m.loaded);
 
     return (

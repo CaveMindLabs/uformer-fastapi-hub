@@ -127,9 +127,16 @@ const ImageProcessorPage = () => {
             formData.append("model_name", modelSelect.value);
             formData.append("use_patch_processing", patchCheckbox.checked);
 
-            try {
-                const response = await fetch('http://127.0.0.1:8000/api/process_image', { method: 'POST', body: formData });
-                if (!response.ok) {
+            // Dispatch an event to tell the header to update its status.
+            window.dispatchEvent(new CustomEvent('forceHeaderUpdate'));
+
+            // Use a brief timeout. This allows the UI (especially the Header) to re-render
+            // with the "model loading" status *before* the main thread is blocked by the fetch call.
+            // This is the key to solving the race condition.
+            setTimeout(async () => {
+                try {
+                    const response = await fetch('http://127.0.0.1:8000/api/process_image', { method: 'POST', body: formData });
+                    if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ detail: 'Server returned an unreadable error.' }));
                     throw new Error(errorData.detail || `Server responded with status ${response.status}`);
                 }
@@ -147,12 +154,11 @@ const ImageProcessorPage = () => {
                 if (error.detail && Array.isArray(error.detail)) {
                     errorMessage = error.detail.map(d => `${d.loc.join(' -> ')}: ${d.msg}`).join('; ');
                 }
-                statusSpan.textContent = `Error: ${errorMessage}. Is the backend running?`;
-            } finally {
-                processImageBtn.disabled = false;
-                // After any processing attempt, tell the header to update everything.
-                window.dispatchEvent(new CustomEvent('forceHeaderUpdate'));
-            }
+                    statusSpan.textContent = `Error: ${errorMessage}. Is the backend running?`;
+                } finally {
+                    processImageBtn.disabled = false;
+                }
+            }, 50); // A small 50ms delay is sufficient to ensure the UI updates.
         };
 
         function setupPanAndZoom() {
