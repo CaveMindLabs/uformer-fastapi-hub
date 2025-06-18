@@ -1,5 +1,5 @@
 /* frontend/src/components/Header.js */
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useImperativeHandle } from 'react';
 import Link from 'next/link';
 
 // Memoized static components to prevent re-rendering when the parent state changes.
@@ -45,12 +45,12 @@ const CacheManager = React.forwardRef(({ defaultClearImages, defaultClearVideos 
             setVideoCacheMb(prevMb => prevMb !== data.video_cache_mb ? data.video_cache_mb : prevMb);
 
         } catch (error) {
-            // Only log the error and set UI to "Error" once to prevent console spam.
+            // If an error occurs (like the backend being down), update the UI.
+            // We only do this if it's not already in an error state to prevent extra re-renders.
             if (!cacheErrorStateRef.current) {
-                console.error("Failed to fetch cache status (backend may be down):", error);
-                cacheErrorStateRef.current = true; // Set error state
-                setImageCacheMb('Error');
-                setVideoCacheMb('Error');
+                cacheErrorStateRef.current = true;
+                setImageCacheMb('...');
+                setVideoCacheMb('...');
             }
         }
     }, []); // Empty dependencies, functional updates are used.
@@ -60,12 +60,8 @@ const CacheManager = React.forwardRef(({ defaultClearImages, defaultClearVideos 
         updateStatus
     }));
 
-    // This useEffect hook sets up the listener for cache updates.
-    useEffect(() => {
-        window.addEventListener('forceCacheUpdate', updateStatus);
-        // Cleanup on unmount
-        return () => window.removeEventListener('forceCacheUpdate', updateStatus);
-    }, [updateStatus]);
+    // This useEffect is no longer needed as the parent Header's polling loop
+    // now calls updateStatus directly via the ref.
 
     const handleClear = async () => {
         if (!confirm(`Are you sure you want to clear the selected cache(s)?`)) return;
@@ -113,13 +109,13 @@ const CacheManager = React.forwardRef(({ defaultClearImages, defaultClearVideos 
 });
 CacheManager.displayName = 'CacheManager'; // for better debugging
 
-const VRAMManager = () => {
+const VRAMManager = React.forwardRef((props, ref) => {
     const [loadedModels, setLoadedModels] = useState([]);
     const [isVramControlVisible, setIsVramControlVisible] = useState(false);
     const [selectedModelsToClear, setSelectedModelsToClear] = useState(new Set());
     const vramErrorStateRef = useRef(false);
 
-    const updateLoadedModelsStatus = useCallback(async () => {
+    const updateStatus = useCallback(async () => {
         try {
             const response = await fetch('http://127.0.0.1:8000/api/loaded_models_status');
             if (!response.ok) throw new Error(`Server returned status ${response.status}`);
@@ -142,12 +138,16 @@ const VRAMManager = () => {
             });
         } catch (error) {
             if (!vramErrorStateRef.current) {
-                console.error("VRAMManager: Failed to fetch status (backend may be down):", error);
                 vramErrorStateRef.current = true;
                 setLoadedModels([]);
             }
         }
     }, []);
+
+    // Expose the updateStatus function to the parent component via the ref.
+    useImperativeHandle(ref, () => ({
+        updateStatus
+    }));
 
     useEffect(() => {
         const checkModelLoadingStrategy = async () => {
@@ -157,16 +157,12 @@ const VRAMManager = () => {
                 const data = await response.json();
                 setIsVramControlVisible(!data.load_all_on_startup);
             } catch (error) {
-                console.error("VRAMManager: Error checking model loading strategy:", error);
+                // This catch is for the initial strategy check only. If it fails, just hide the component.
                 setIsVramControlVisible(false);
             }
         };
-
-        window.addEventListener('forceVRAMUpdate', updateLoadedModelsStatus);
         checkModelLoadingStrategy();
-        
-        return () => window.removeEventListener('forceVRAMUpdate', updateLoadedModelsStatus);
-    }, [updateLoadedModelsStatus]);
+    }, []); // This effect runs only once on mount.
 
     const handleModelSelectionChange = (modelName) => {
         setSelectedModelsToClear(prev => {
@@ -194,7 +190,7 @@ const VRAMManager = () => {
             const result = await response.json();
             if (!response.ok) throw new Error(result.detail || 'Failed to unload models.');
             alert(result.message || 'Models unloaded successfully!');
-            await updateLoadedModelsStatus(); // Force immediate refresh
+            await updateStatus(); // Force immediate refresh
         } catch (error) {
             alert(`An error occurred while unloading models: ${error.message}`);
         }
@@ -234,34 +230,36 @@ const VRAMManager = () => {
             </div>
         </div>
     );
-};
+});
+VRAMManager.displayName = 'VRAMManager';
 
 // The main Header component
 const Header = ({ activePage, pageTitle, defaultClearImages, defaultClearVideos }) => {
     const cacheManagerRef = useRef(null);
+    const vramManagerRef = useRef(null);
 
-    // This useEffect hook now only manages the polling and event listening.
-    // It triggers updates in the child components.
+    // This useEffect hook manages polling and calls updates on child components via refs.
     useEffect(() => {
-        const handleForceUpdate = () => {
-            // Dispatch specific events for child components to listen to.
-            // This is more modular than calling refs directly in a polling loop.
-            window.dispatchEvent(new CustomEvent('forceCacheUpdate'));
-            window.dispatchEvent(new CustomEvent('forceVRAMUpdate'));
+        const updateAllStatus = () => {
+            if (cacheManagerRef.current) {
+                cacheManagerRef.current.updateStatus();
+            }
+            if (vramManagerRef.current) {
+                vramManagerRef.current.updateStatus();
+            }
         };
 
-        // For immediate updates triggered by page actions (e.g., after processing).
-        // This single event is now broadcast to all children.
-        window.addEventListener('forceHeaderUpdate', handleForceUpdate);
+        // This event allows other pages to trigger an immediate, on-demand update.
+        window.addEventListener('forceHeaderUpdate', updateAllStatus);
 
-        // For consistent, background/cross-tab updates.
-        const pollInterval = setInterval(handleForceUpdate, 2000);
+        // Set up the polling for consistent background/cross-tab updates.
+        const pollInterval = setInterval(updateAllStatus, 2000);
 
-        handleForceUpdate(); // Initial update on mount
+        updateAllStatus(); // Initial update on mount
 
         // Cleanup function to run when the component unmounts.
         return () => {
-            window.removeEventListener('forceHeaderUpdate', handleForceUpdate);
+            window.removeEventListener('forceHeaderUpdate', updateAllStatus);
             clearInterval(pollInterval);
         };
     }, []);
@@ -272,11 +270,11 @@ const Header = ({ activePage, pageTitle, defaultClearImages, defaultClearVideos 
             <TitleBlock pageTitle={pageTitle} />
             <div className="cache-info-block" style={{ flexDirection: 'row', gap: '20px', alignItems: 'stretch', width: 'auto' }}>
                 <CacheManager 
-                    ref={cacheManagerRef} // ref is kept for potential direct calls if needed in future
+                    ref={cacheManagerRef}
                     defaultClearImages={defaultClearImages} 
                     defaultClearVideos={defaultClearVideos} 
                 />
-                <VRAMManager />
+                <VRAMManager ref={vramManagerRef} />
             </div>
         </header>
     );
