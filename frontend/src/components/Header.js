@@ -39,12 +39,17 @@ const CacheManager = React.forwardRef(({ defaultClearImages, defaultClearVideos 
         }
     }, []); // Empty dependencies, functional updates are used.
 
-    // Expose the updateStatus function via the ref for the parent component to call.
+    // Expose the updateStatus function via the ref for the parent component to call for on-demand clearing.
     React.useImperativeHandle(ref, () => ({
         updateStatus
     }));
 
-    // The useEffect hook for updates is no longer needed here; the parent's polling loop controls all updates.
+    // This useEffect hook sets up the listener for cache updates.
+    useEffect(() => {
+        window.addEventListener('forceCacheUpdate', updateStatus);
+        // Cleanup on unmount
+        return () => window.removeEventListener('forceCacheUpdate', updateStatus);
+    }, [updateStatus]);
 
     const handleClear = async () => {
         if (!confirm(`Are you sure you want to clear the selected cache(s)?`)) return;
@@ -92,33 +97,22 @@ const CacheManager = React.forwardRef(({ defaultClearImages, defaultClearVideos 
 });
 CacheManager.displayName = 'CacheManager'; // for better debugging
 
-// The main Header component
-const Header = ({ activePage, pageTitle, defaultClearImages, defaultClearVideos }) => {
+const VRAMManager = () => {
     const [loadedModels, setLoadedModels] = useState([]);
     const [isVramControlVisible, setIsVramControlVisible] = useState(false);
-    const [selectedModelsToClear, setSelectedModelsToClear] = useState(new Set()); // Corrected: Must be a state variable
-    const vramErrorStateRef = useRef(false); // Ref to track error state for VRAM status
+    const [selectedModelsToClear, setSelectedModelsToClear] = useState(new Set());
+    const vramErrorStateRef = useRef(false);
 
     const updateLoadedModelsStatus = useCallback(async () => {
         try {
             const response = await fetch('http://127.0.0.1:8000/api/loaded_models_status');
             if (!response.ok) throw new Error("Failed to fetch loaded models status.");
             const data = await response.json();
-            
-            // On successful fetch, reset the error state.
-            if (vramErrorStateRef.current) {
-                vramErrorStateRef.current = false;
-            }
 
-            setLoadedModels(prevModels => {
-                // Prevent re-render if the model data is identical to avoid flicker.
-                if (JSON.stringify(prevModels) === JSON.stringify(data.models || [])) {
-                    return prevModels;
-                }
-                return data.models || [];
-            });
+            if (vramErrorStateRef.current) vramErrorStateRef.current = false;
 
-            // Clean up 'selected to clear' models if they become unloaded by other means
+            setLoadedModels(prev => JSON.stringify(prev) !== JSON.stringify(data.models || []) ? data.models || [] : prev);
+
             setSelectedModelsToClear(prev => {
                 const newSet = new Set(prev);
                 let changed = false;
@@ -131,55 +125,31 @@ const Header = ({ activePage, pageTitle, defaultClearImages, defaultClearVideos 
                 return changed ? newSet : prev;
             });
         } catch (error) {
-            // Only log the error and update state once to prevent console spam and UI flicker.
             if (!vramErrorStateRef.current) {
-                console.error("Failed to fetch loaded models status (backend may be down):", error);
-                vramErrorStateRef.current = true; // Set error state
-                setLoadedModels([]); // Set to empty on error
+                console.error("VRAMManager: Failed to fetch status (backend may be down):", error);
+                vramErrorStateRef.current = true;
+                setLoadedModels([]);
             }
         }
-    }, []); // No dependencies, as we use functional updates and refs
+    }, []);
 
-    // We need to get the update function for the cache from the CacheManager
-    const cacheManagerRef = useRef(null);
-
-    // This useEffect hook sets up polling and a listener for state updates.
     useEffect(() => {
-        async function checkModelLoadingStrategy() {
+        const checkModelLoadingStrategy = async () => {
             try {
                 const response = await fetch('http://127.0.0.1:8000/api/model_loading_strategy');
                 if (!response.ok) throw new Error(`Failed to fetch model loading strategy. Status: ${response.status}`);
                 const data = await response.json();
                 setIsVramControlVisible(!data.load_all_on_startup);
             } catch (error) {
-                console.error("Error in checkModelLoadingStrategy:", error);
+                console.error("VRAMManager: Error checking model loading strategy:", error);
                 setIsVramControlVisible(false);
             }
-        }
-
-        const handleForceUpdate = () => {
-            // This function updates both VRAM and Cache status.
-            updateLoadedModelsStatus();
-            if (cacheManagerRef.current) {
-                cacheManagerRef.current.updateStatus();
-            }
         };
 
-        // For immediate updates triggered by page actions (e.g., after processing).
-        window.addEventListener('forceHeaderUpdate', handleForceUpdate);
-
-        // For consistent, background/cross-tab updates.
-        const pollInterval = setInterval(handleForceUpdate, 2000);
-
+        window.addEventListener('forceVRAMUpdate', updateLoadedModelsStatus);
         checkModelLoadingStrategy();
-        handleForceUpdate(); // Initial update on mount
-
-        // Cleanup function to run when the component unmounts.
-        return () => {
-            window.removeEventListener('forceHeaderUpdate', handleForceUpdate);
-            clearInterval(pollInterval);
-        };
-
+        
+        return () => window.removeEventListener('forceVRAMUpdate', updateLoadedModelsStatus);
     }, [updateLoadedModelsStatus]);
 
     const handleModelSelectionChange = (modelName) => {
@@ -208,13 +178,77 @@ const Header = ({ activePage, pageTitle, defaultClearImages, defaultClearVideos 
             const result = await response.json();
             if (!response.ok) throw new Error(result.detail || 'Failed to unload models.');
             alert(result.message || 'Models unloaded successfully!');
-            await updateLoadedModelsStatus();
+            await updateLoadedModelsStatus(); // Force immediate refresh
         } catch (error) {
             alert(`An error occurred while unloading models: ${error.message}`);
         }
     };
-    
+
+    if (!isVramControlVisible) return null;
+
     const isAnyModelLoaded = loadedModels.some(m => m.loaded);
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minWidth: '200px' }}>
+            <style jsx>{`
+                .vram-button { padding: 6px 10px; font-size: 0.85rem; border: none; border-radius: 5px; cursor: pointer; transition: background-color 0.2s, filter 0.2s; }
+                .vram-button.clear-selected { background-color: #f0e68c; color: #333; }
+                .vram-button.clear-all { background-color: #61dafb; color: #20232a; }
+                .vram-button:hover:not(:disabled) { filter: brightness(0.9); }
+                .vram-button:disabled { background-color: #cccccc !important; color: #666666 !important; cursor: not-allowed; filter: none; }
+            `}</style>
+            <div style={{ marginBottom: '5px', maxHeight: '80px', overflowY: 'auto', width: '100%' }}>
+                {loadedModels.map(model => (
+                    <label key={model.name} className="cache-line" style={{ fontSize: '0.85rem' }}>
+                        <input type="checkbox" checked={selectedModelsToClear.has(model.name)} onChange={() => handleModelSelectionChange(model.name)} disabled={!model.loaded} />
+                        <span className="cache-label-text" style={{ marginLeft: '8px' }}>{model.name}</span>
+                        <span style={{ color: model.loaded ? '#86e58b' : '#ff7a7a', fontWeight: 'bold', minWidth: '65px', textAlign: 'right', marginLeft: 'auto' }}>
+                            {model.loaded ? 'Loaded' : 'Unloaded'}
+                        </span>
+                    </label>
+                ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                <button className="vram-button clear-selected" disabled={selectedModelsToClear.size === 0} onClick={() => handleClearModels(Array.from(selectedModelsToClear))}>
+                    Clear Selected
+                </button>
+                <button className="vram-button clear-all" disabled={!isAnyModelLoaded} onClick={() => handleClearModels([])}>
+                    Clear All
+                </button>
+            </div>
+        </div>
+    );
+};
+
+// The main Header component
+const Header = ({ activePage, pageTitle, defaultClearImages, defaultClearVideos }) => {
+    const cacheManagerRef = useRef(null);
+
+    // This useEffect hook now only manages the polling and event listening.
+    // It triggers updates in the child components.
+    useEffect(() => {
+        const handleForceUpdate = () => {
+            // Dispatch specific events for child components to listen to.
+            // This is more modular than calling refs directly in a polling loop.
+            window.dispatchEvent(new CustomEvent('forceCacheUpdate'));
+            window.dispatchEvent(new CustomEvent('forceVRAMUpdate'));
+        };
+
+        // For immediate updates triggered by page actions (e.g., after processing).
+        // This single event is now broadcast to all children.
+        window.addEventListener('forceHeaderUpdate', handleForceUpdate);
+
+        // For consistent, background/cross-tab updates.
+        const pollInterval = setInterval(handleForceUpdate, 2000);
+
+        handleForceUpdate(); // Initial update on mount
+
+        // Cleanup function to run when the component unmounts.
+        return () => {
+            window.removeEventListener('forceHeaderUpdate', handleForceUpdate);
+            clearInterval(pollInterval);
+        };
+    }, []);
 
     return (
         <header>
@@ -229,46 +263,11 @@ const Header = ({ activePage, pageTitle, defaultClearImages, defaultClearVideos 
             </div>
             <div className="cache-info-block" style={{ flexDirection: 'row', gap: '20px', alignItems: 'stretch', width: 'auto' }}>
                 <CacheManager 
-                    ref={cacheManagerRef}
+                    ref={cacheManagerRef} // ref is kept for potential direct calls if needed in future
                     defaultClearImages={defaultClearImages} 
                     defaultClearVideos={defaultClearVideos} 
                 />
-                {isVramControlVisible && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minWidth: '200px' }}>
-                        <style jsx>{`
-                            .vram-button { padding: 6px 10px; font-size: 0.85rem; border: none; border-radius: 5px; cursor: pointer; transition: background-color 0.2s, filter 0.2s; }
-                            .vram-button.clear-selected { background-color: #f0e68c; color: #333; }
-                            .vram-button.clear-all { background-color: #61dafb; color: #20232a; }
-                            .vram-button:hover:not(:disabled) { filter: brightness(0.9); }
-                            /* This is the correct disabled style from the screenshot. */
-                            .vram-button:disabled {
-                                background-color: #cccccc !important; /* Use a light gray background */
-                                color: #666666 !important; /* Use a darker gray for the text */
-                                cursor: not-allowed;
-                                filter: none;
-                            }
-                        `}</style>
-                        <div style={{ marginBottom: '5px', maxHeight: '80px', overflowY: 'auto', width: '100%' }}>
-                            {loadedModels.map(model => (
-                                <label key={model.name} className="cache-line" style={{ fontSize: '0.85rem' }}>
-                                    <input type="checkbox" checked={selectedModelsToClear.has(model.name)} onChange={() => handleModelSelectionChange(model.name)} disabled={!model.loaded} />
-                                    <span className="cache-label-text" style={{ marginLeft: '8px' }}>{model.name}</span>
-                                    <span style={{ color: model.loaded ? '#86e58b' : '#ff7a7a', fontWeight: 'bold', minWidth: '65px', textAlign: 'right', marginLeft: 'auto' }}>
-                                        {model.loaded ? 'Loaded' : 'Unloaded'}
-                                    </span>
-                                </label>
-                            ))}
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                            <button className="vram-button clear-selected" disabled={selectedModelsToClear.size === 0} onClick={() => handleClearModels(Array.from(selectedModelsToClear))}>
-                                Clear Selected
-                            </button>
-                            <button className="vram-button clear-all" disabled={!isAnyModelLoaded} onClick={() => handleClearModels([])}>
-                                Clear All
-                            </button>
-                        </div>
-                    </div>
-                )}
+                <VRAMManager />
             </div>
         </header>
     );
