@@ -310,16 +310,17 @@ const ImageProcessorPage = () => {
                     <div className="image-box">
                         <style jsx>{`
                             .enhanced-header-text {
-                                color: #86e58b;
+                                color: #f0e68c; /* Golden-khaki text */
                             }
                             #downloadBtn.enhanced-style {
-                                background-color: #86e58b;
-                                border-color: #75c97a;
-                                color: #20232a; /* Dark text for better contrast on the green button */
+                                background-color: #f0e68c; /* Golden-khaki background */
+                                border-color: #d8c973;
+                                color: #333; /* Darker text for contrast on the light button */
+                                font-weight: 500;
                             }
                             #downloadBtn.enhanced-style:hover {
-                                background-color: #75c97a;
-                                border-color: #65a168;
+                                background-color: #d8c973;
+                                border-color: #bfae5a;
                             }
                         `}</style>
                         <div className="image-header">
