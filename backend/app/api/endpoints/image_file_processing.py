@@ -178,4 +178,3 @@ async def process_image(
         print(f"[IMAGE_PROCESSOR] ERROR: Failed to process image: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to process image: {e}")
- 
