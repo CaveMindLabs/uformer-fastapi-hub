@@ -68,12 +68,21 @@ def run_image_enhancement_task(
 
         # Define task-specific directories
         base_temp_dir = os.path.join("temp", "images", task_type)
+        image_upload_dir = os.path.join(base_temp_dir, "uploads")
         developed_dir = os.path.join(base_temp_dir, "developed_inputs")
         image_processed_dir = os.path.join(base_temp_dir, "processed")
-        for dir_path in [developed_dir, image_processed_dir]:
+        for dir_path in [image_upload_dir, developed_dir, image_processed_dir]:
             os.makedirs(dir_path, exist_ok=True)
         
         unique_id = f"{int(time.time())}_{task_id[:8]}"
+
+        # --- Save the original uploaded file ---
+        # This restores the functionality to save the pristine, original file.
+        original_saved_filename = f"{unique_id}_original_upload_{original_filename}"
+        original_filepath = os.path.join(image_upload_dir, original_saved_filename)
+        with open(original_filepath, "wb") as f:
+            f.write(file_contents)
+        print(f"[BG-TASK:{task_id}] Saved original uploaded file to: {original_filepath}")
 
         # Step 1: Prepare the input image into a standard NumPy array
         if original_filename.lower().endswith(('.arw', '.nef', '.cr2', '.dng')):
