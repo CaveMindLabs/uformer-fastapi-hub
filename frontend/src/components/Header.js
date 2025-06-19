@@ -236,7 +236,8 @@ const VRAMManager = React.forwardRef((props, ref) => {
 
                     if (skipped_models.length > 0) {
                         const plural = skipped_models.length === 1 ? 'model' : 'models';
-                        messages.push(`Could not unload ${skipped_models.length} ${plural} as they are in use: ${skipped_models.join(', ')}.`);
+                        const verbPhrase = skipped_models.length === 1 ? 'it is' : 'they are';
+                        messages.push(`Could not unload ${skipped_models.length} ${plural} as ${verbPhrase} in use: ${skipped_models.join(', ')}.`);
                         modalStatus = unloaded_models.length > 0 ? 'warning' : 'error';
                         modalTitle = unloaded_models.length > 0 ? 'Action Partially Completed' : 'Models in Use';
                     }
