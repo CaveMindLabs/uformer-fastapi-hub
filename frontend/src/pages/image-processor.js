@@ -75,6 +75,43 @@ const ImageProcessorPage = () => {
         }
     }, []);
 
+    const handleDownload = async (e) => {
+        e.preventDefault(); // Stop the browser from navigating to the link
+        if (!processedImageSrc) return;
+
+        try {
+            const originalStatus = statusText;
+            setStatusText("Preparing download...");
+            
+            // Fetch the image from the cross-origin URL
+            const response = await fetch(processedImageSrc);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch image. Status: ${response.status}`);
+            }
+            const blob = await response.blob();
+            
+            // Create a temporary link to trigger the download
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            const fileName = `enhanced_${selectedImageFile.current?.name || 'image.jpg'}`;
+            link.setAttribute('download', fileName);
+            
+            // Append to body, click, and remove
+            document.body.appendChild(link);
+            link.click();
+            
+            // Cleanup
+            link.parentNode.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            
+            setStatusText(originalStatus); // Restore the status text
+        } catch (error) {
+            console.error("Download failed:", error);
+            setStatusText(`Error: Download failed. ${error.message}`);
+        }
+    };
+
     const handleProcessImage = async () => {
         if (!selectedImageFile.current) {
             setStatusText("Error: No image selected.");
@@ -261,7 +298,7 @@ const ImageProcessorPage = () => {
                     <div className="image-box">
                         <div className="image-header">
                             <h3>Enhanced Image</h3>
-                            <a id="downloadBtn" href={processedImageSrc || '#'} className={!processedImageSrc ? 'hidden' : ''} download={`enhanced_${selectedImageFile.current?.name || 'image.jpg'}`}>Download</a>
+                            <a id="downloadBtn" href={processedImageSrc || '#'} className={!processedImageSrc ? 'hidden' : ''} onClick={handleDownload}>Download</a>
                         </div>
                         <div className="image-player-wrapper">
                             <img id="processedImage" ref={processedImageRef} src={processedImageSrc} className={`image-display ${!processedImageSrc ? 'hidden' : ''}`} alt="Processed" />
