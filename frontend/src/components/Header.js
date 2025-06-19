@@ -101,6 +101,7 @@ const CacheManager = React.forwardRef(({ defaultClearImages, defaultClearVideos 
                 title={modalState.title}
                 confirmText={modalState.confirmText}
                 showCancel={modalState.showCancel}
+                status={modalState.status}
             >
                 {modalState.content}
             </Modal>
@@ -247,7 +248,14 @@ const VRAMManager = React.forwardRef((props, ref) => {
                         modalTitle = 'Info';
                     }
                     
-                    setModalState({ isOpen: true, title: modalTitle, status: modalStatus, content: messages.join(' '), onConfirm: null, showCancel: false, confirmText: 'OK' });
+                    // Create JSX for the content to allow for separate lines.
+                    const modalContent = (
+                        <div>
+                            {messages.map((msg, index) => <p key={index} style={{ margin: '0 0 10px 0', padding: 0, lineHeight: '1.4' }}>{msg}</p>)}
+                        </div>
+                    );
+
+                    setModalState({ isOpen: true, title: modalTitle, status: modalStatus, content: modalContent, onConfirm: null, showCancel: false, confirmText: 'OK' });
                     await updateStatus(); // Force immediate refresh
                 } catch (error) {
                     setModalState({ isOpen: true, title: 'Error', status: 'error', content: `An error occurred while unloading models: ${error.message}`, onConfirm: null, showCancel: false, confirmText: 'OK' });
@@ -284,6 +292,7 @@ const VRAMManager = React.forwardRef((props, ref) => {
                 title={modalState.title}
                 confirmText={modalState.confirmText}
                 showCancel={modalState.showCancel}
+                status={modalState.status}
             >
                 {modalState.content}
             </Modal>
