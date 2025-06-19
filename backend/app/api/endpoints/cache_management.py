@@ -111,7 +111,8 @@ async def unload_models_endpoint(request: UnloadModelsRequest):
             device = app_models.get("device", torch.device("cpu"))
             unloaded_count = 0
             for model_name in model_names_to_unload:
-                if model_name in app_models and model_name not in ['device', 'load_all_on_startup']:
+                # Make this logic consistent: only unload if it's a defined model.
+                if model_name in app_models and model_name in model_definitions_dict:
                     del app_models[model_name]
                     unloaded_count += 1
                     print(f"Model '{model_name}' unloaded.")

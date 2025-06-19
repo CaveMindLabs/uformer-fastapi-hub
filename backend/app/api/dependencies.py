@@ -22,7 +22,9 @@ def unload_all_models_from_memory(models_dict: Dict[str, Any]):
     """Clears all loaded model instances from the shared dictionary and CUDA cache."""
     device = models_dict.get("device", torch.device("cpu"))
     print(f"Clearing all loaded models from memory on {device}...")
-    keys_to_delete = [k for k in models_dict.keys() if k not in ['device', 'load_all_on_startup']]
+    # This is the key change: only delete keys that are defined as models.
+    # This prevents the deletion of 'tasks_db' or other essential state keys.
+    keys_to_delete = [k for k in models_dict.keys() if k in model_definitions_dict]
     for key in keys_to_delete:
         del models_dict[key]
     if device.type == 'cuda':
