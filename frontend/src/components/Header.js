@@ -223,11 +223,33 @@ const VRAMManager = React.forwardRef((props, ref) => {
                     });
                     const result = await response.json();
                     if (!response.ok) throw new Error(result.detail || 'Failed to unload models.');
+
+                    const { unloaded_models, skipped_models } = result;
+                    let modalTitle = 'Success';
+                    let modalStatus = 'success';
+                    let messages = [];
+
+                    if (unloaded_models.length > 0) {
+                        const plural = unloaded_models.length === 1 ? 'model' : 'models';
+                        messages.push(`Successfully unloaded ${unloaded_models.length} ${plural}: ${unloaded_models.join(', ')}.`);
+                    }
+
+                    if (skipped_models.length > 0) {
+                        const plural = skipped_models.length === 1 ? 'model' : 'models';
+                        messages.push(`Could not unload ${skipped_models.length} ${plural} as they are in use: ${skipped_models.join(', ')}.`);
+                        modalStatus = unloaded_models.length > 0 ? 'warning' : 'error';
+                        modalTitle = unloaded_models.length > 0 ? 'Action Partially Completed' : 'Models in Use';
+                    }
+
+                    if (unloaded_models.length === 0 && skipped_models.length === 0) {
+                        messages.push('No models were eligible for unloading.');
+                        modalTitle = 'Info';
+                    }
                     
-                    setModalState({ isOpen: true, title: 'Success', content: result.message || 'Models unloaded successfully!', onConfirm: null, showCancel: false, confirmText: 'OK' });
+                    setModalState({ isOpen: true, title: modalTitle, status: modalStatus, content: messages.join(' '), onConfirm: null, showCancel: false, confirmText: 'OK' });
                     await updateStatus(); // Force immediate refresh
                 } catch (error) {
-                    setModalState({ isOpen: true, title: 'Error', content: `An error occurred while unloading models: ${error.message}`, onConfirm: null, showCancel: false, confirmText: 'OK' });
+                    setModalState({ isOpen: true, title: 'Error', status: 'error', content: `An error occurred while unloading models: ${error.message}`, onConfirm: null, showCancel: false, confirmText: 'OK' });
                 }
             }
         });

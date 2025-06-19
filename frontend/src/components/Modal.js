@@ -1,7 +1,7 @@
 /* frontend/src/components/Modal.js */
 import React from 'react';
 
-const Modal = ({ isOpen, onClose, onConfirm, title, children, confirmText = 'Confirm', cancelText = 'Cancel', showCancel = true }) => {
+const Modal = ({ isOpen, onClose, onConfirm, title, children, confirmText = 'Confirm', cancelText = 'Cancel', showCancel = true, status = 'success' }) => {
     if (!isOpen) {
         return null;
     }
@@ -82,10 +82,31 @@ const Modal = ({ isOpen, onClose, onConfirm, title, children, confirmText = 'Con
                     background-color: #5a5f6a;
                     border-color: #666;
                 }
+                }
+                /* Warning Status Colors */
+                .modal-content.warning .modal-title, .modal-content.warning .confirm-button {
+                    color: #333;
+                    background-color: #f0e68c;
+                    border-color: #d8c973;
+                }
+                .modal-content.warning .confirm-button:hover {
+                    background-color: #d8c973;
+                    border-color: #bfae5a;
+                }
+                /* Error Status Colors */
+                 .modal-content.error .modal-title, .modal-content.error .confirm-button {
+                    color: #fff;
+                    background-color: #e05252;
+                    border-color: #d04242;
+                }
+                .modal-content.error .confirm-button:hover {
+                    background-color: #d04242;
+                    border-color: #b03232;
+                }
             `}</style>
             <div className="modal-overlay" onClick={onClose}>
-                <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                    {title && <h2 className="modal-title">{title}</h2>}
+                <div className={`modal-content ${status}`} onClick={(e) => e.stopPropagation()}>
+                    <h2 className="modal-title">{title || 'Notification'}</h2>
                     <div className="modal-body">
                         {children}
                     </div>

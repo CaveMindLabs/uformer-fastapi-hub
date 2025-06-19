@@ -139,16 +139,11 @@ async def unload_models_endpoint(request: UnloadModelsRequest):
             torch.cuda.empty_cache()
             print("CUDA cache cleared.")
         
-        message = ""
-        if unloaded_models:
-            message += f"Successfully unloaded {len(unloaded_models)} model(s): {', '.join(unloaded_models)}. "
-        if skipped_models:
-            message += f"Could not unload {len(skipped_models)} model(s) as they are in use: {', '.join(skipped_models)}."
-        if not message:
-            # This handles cases where no models were selected, or selected models were not loaded.
-            message = "No models were eligible for unloading."
-
-        return JSONResponse(status_code=200, content={"message": message})
+        # Instead of a pre-formatted string, return structured data.
+        return JSONResponse(status_code=200, content={
+            "unloaded_models": unloaded_models,
+            "skipped_models": skipped_models
+        })
 
     except Exception as e:
         print(f"Error unloading models: {e}")
