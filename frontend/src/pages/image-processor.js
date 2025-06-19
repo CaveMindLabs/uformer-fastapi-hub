@@ -20,6 +20,7 @@ const ImageProcessorPage = () => {
     const [originalImageSrc, setOriginalImageSrc] = useState(null);
     const [processedImageSrc, setProcessedImageSrc] = useState(null);
     const [taskId, setTaskId] = useState(null);
+    const [finalDownloadFilename, setFinalDownloadFilename] = useState(''); // State to hold the definitive filename
 
     const cleanupPolling = () => {
         if (pollIntervalRef.current) {
@@ -33,6 +34,7 @@ const ImageProcessorPage = () => {
         setProcessedImageSrc(null);
         setIsProcessing(false);
         setTaskId(null);
+        setFinalDownloadFilename('');
         selectedImageFile.current = null;
         if (uploadAreaRef.current) uploadAreaRef.current.style.borderColor = '#ccc';
         setStatusText("Please select an image file. Supports: jpeg, png, gif, webp, .arw, .nef, .cr2, .dng.");
@@ -94,8 +96,8 @@ const ImageProcessorPage = () => {
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            const fileName = `enhanced_${selectedImageFile.current?.name || 'image.jpg'}`;
-            link.setAttribute('download', fileName);
+            // Use the locked-in filename from the state
+            link.setAttribute('download', finalDownloadFilename);
             
             // Append to body, click, and remove
             document.body.appendChild(link);
@@ -141,6 +143,16 @@ const ImageProcessorPage = () => {
             if (!response.ok) {
                 throw new Error(result.detail || 'Failed to start processing task.');
             }
+
+            // --- Lock in the filename as soon as the task is accepted ---
+            const taskType = taskSelectRef.current.value;
+            const modelName = modelSelectRef.current.value;
+            const usePatch = patchCheckboxRef.current.checked;
+            const patchString = usePatch ? '_patch' : '';
+            const originalFileName = selectedImageFile.current?.name || 'image.jpg';
+            const constructedFilename = `enhanced_${taskType}_${modelName}${patchString}_${originalFileName.replace(/\s+/g, '_')}`;
+            setFinalDownloadFilename(constructedFilename);
+            // -----------------------------------------------------------
             
             const newTaskId = result.task_id;
             setTaskId(newTaskId);
@@ -296,9 +308,28 @@ const ImageProcessorPage = () => {
                         </div>
                     </div>
                     <div className="image-box">
+                        <style jsx>{`
+                            .enhanced-header-text {
+                                color: #86e58b;
+                            }
+                            #downloadBtn.enhanced-style {
+                                background-color: #86e58b;
+                                border-color: #75c97a;
+                                color: #20232a; /* Dark text for better contrast on the green button */
+                            }
+                            #downloadBtn.enhanced-style:hover {
+                                background-color: #75c97a;
+                                border-color: #65a168;
+                            }
+                        `}</style>
                         <div className="image-header">
-                            <h3>Enhanced Image</h3>
-                            <a id="downloadBtn" href={processedImageSrc || '#'} className={!processedImageSrc ? 'hidden' : ''} onClick={handleDownload}>Download</a>
+                            <h3 className="enhanced-header-text">Enhanced Image</h3>
+                            <a id="downloadBtn" 
+                               href={processedImageSrc || '#'} 
+                               className={`enhanced-style ${!processedImageSrc ? 'hidden' : ''}`} 
+                               onClick={handleDownload}>
+                                Download
+                            </a>
                         </div>
                         <div className="image-player-wrapper">
                             <img id="processedImage" ref={processedImageRef} src={processedImageSrc} className={`image-display ${!processedImageSrc ? 'hidden' : ''}`} alt="Processed" />
