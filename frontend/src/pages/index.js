@@ -198,7 +198,9 @@ const LiveStreamPage = () => {
                         <video id="webcam" ref={webcamVideoRef} className="video" autoPlay playsInline muted></video>
                     </div>
                     <div className="video-box">
-                        <div className="video-header" style={{ justifyContent: 'center' }}><h3>Enhanced Stream</h3></div>
+                        <div className="video-header" style={{ justifyContent: 'center' }}>
+                            <h3 style={{ color: '#f0e68c' }}>Enhanced Stream</h3>
+                        </div>
                         {/* The processed image is mirrored via CSS for consistency */}
                         <img id="processedImage" ref={processedImageRef} className="image-display" alt="Processed stream from backend" />
                     </div>
