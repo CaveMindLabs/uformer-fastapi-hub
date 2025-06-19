@@ -32,19 +32,27 @@ const Modal = ({ isOpen, onClose, onConfirm, title, children, confirmText = 'Con
                     background-color: #282c34;
                     padding: 25px;
                     border-radius: 8px;
-                    border: 1px solid #61dafb;
+                    border: 1px solid #61dafb; /* Default/Success border */
                     width: 90%;
                     max-width: 450px;
                     box-shadow: 0 5px 15px rgba(0,0,0,0.5);
                     color: #e6e6e6;
                     text-align: center;
+                    transition: border-color 0.2s;
                 }
+                .modal-content.warning { border-color: #f0e68c; } /* Yellow border for warning */
+                .modal-content.error { border-color: #e05252; } /* Red border for error */
+                
                 .modal-title {
                     margin-top: 0;
                     margin-bottom: 20px;
-                    color: #61dafb;
+                    color: #61dafb; /* Default/Success title color */
                     font-size: 1.5rem;
+                    transition: color 0.2s;
                 }
+                .modal-content.warning .modal-title { color: #f0e68c; } /* Yellow title text */
+                .modal-content.error .modal-title { color: #e05252; } /* Red title text */
+
                 .modal-body {
                     margin-bottom: 25px;
                     font-size: 1rem;
@@ -64,6 +72,8 @@ const Modal = ({ isOpen, onClose, onConfirm, title, children, confirmText = 'Con
                     font-weight: 500;
                     transition: background-color 0.2s, border-color 0.2s;
                 }
+                
+                /* Default/Success Button Style */
                 .confirm-button {
                     background-color: #61dafb;
                     color: #20232a;
@@ -73,6 +83,29 @@ const Modal = ({ isOpen, onClose, onConfirm, title, children, confirmText = 'Con
                     background-color: #52b9d8;
                     border-color: #52b9d8;
                 }
+
+                /* Warning Button Style */
+                .confirm-button.warning {
+                    background-color: #f0e68c;
+                    color: #333;
+                    border-color: #d8c973;
+                }
+                .confirm-button.warning:hover {
+                    background-color: #d8c973;
+                    border-color: #bfae5a;
+                }
+                
+                /* Error Button Style */
+                .confirm-button.error {
+                    background-color: #e05252;
+                    color: #fff;
+                    border-color: #d04242;
+                }
+                .confirm-button.error:hover {
+                    background-color: #d04242;
+                    border-color: #b03232;
+                }
+
                 .cancel-button {
                     background-color: #4a4f5a;
                     color: #e6e6e6;
@@ -81,27 +114,6 @@ const Modal = ({ isOpen, onClose, onConfirm, title, children, confirmText = 'Con
                 .cancel-button:hover {
                     background-color: #5a5f6a;
                     border-color: #666;
-                }
-                }
-                /* Warning Status Colors */
-                .modal-content.warning .modal-title, .modal-content.warning .confirm-button {
-                    color: #333;
-                    background-color: #f0e68c;
-                    border-color: #d8c973;
-                }
-                .modal-content.warning .confirm-button:hover {
-                    background-color: #d8c973;
-                    border-color: #bfae5a;
-                }
-                /* Error Status Colors */
-                 .modal-content.error .modal-title, .modal-content.error .confirm-button {
-                    color: #fff;
-                    background-color: #e05252;
-                    border-color: #d04242;
-                }
-                .modal-content.error .confirm-button:hover {
-                    background-color: #d04242;
-                    border-color: #b03232;
                 }
             `}</style>
             <div className="modal-overlay" onClick={onClose}>
@@ -116,7 +128,7 @@ const Modal = ({ isOpen, onClose, onConfirm, title, children, confirmText = 'Con
                                 {cancelText}
                             </button>
                         )}
-                        <button className="modal-button confirm-button" onClick={handleConfirm}>
+                        <button className={`modal-button confirm-button ${status}`} onClick={handleConfirm}>
                             {confirmText}
                         </button>
                     </div>

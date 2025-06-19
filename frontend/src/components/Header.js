@@ -236,11 +236,18 @@ const VRAMManager = React.forwardRef((props, ref) => {
                     }
 
                     if (skipped_models.length > 0) {
-                        const plural = skipped_models.length === 1 ? 'model' : 'models';
+                        const skippedPlural = skipped_models.length === 1 ? 'model' : 'models';
                         const verbPhrase = skipped_models.length === 1 ? 'it is' : 'they are';
-                        messages.push(`Could not unload ${skipped_models.length} ${plural} as ${verbPhrase} in use: ${skipped_models.join(', ')}.`);
+                        messages.push(`Could not unload ${skipped_models.length} ${skippedPlural} as ${verbPhrase} in use: ${skipped_models.join(', ')}.`);
+                        
                         modalStatus = unloaded_models.length > 0 ? 'warning' : 'error';
-                        modalTitle = unloaded_models.length > 0 ? 'Action Partially Completed' : 'Models in Use';
+                        
+                        if (unloaded_models.length > 0) {
+                            modalTitle = 'Action Partially Completed';
+                        } else {
+                            // Set title dynamically based on number of models in use.
+                            modalTitle = skipped_models.length === 1 ? 'Model in Use' : 'Models in Use';
+                        }
                     }
 
                     if (unloaded_models.length === 0 && skipped_models.length === 0) {
