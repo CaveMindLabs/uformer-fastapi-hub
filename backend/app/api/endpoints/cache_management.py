@@ -2,17 +2,21 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 import os
 import shutil
 import traceback
 import torch
+import time
 
 from app.api.dependencies import app_models, unload_all_models_from_memory # Import app_models and the new utility
 from app.api.dependencies import model_definitions_dict # Import this here
 
 class UnloadModelsRequest(BaseModel):
     model_names: List[str] = Field(default_factory=list)
+
+class ConfirmDownloadRequest(BaseModel):
+    result_path: str
 
 router = APIRouter()
 
@@ -72,31 +76,89 @@ async def get_cache_status():
 @router.post("/api/clear_cache", tags=["cache_management"])
 async def clear_cache(clear_images: bool = True, clear_videos: bool = True):
     """
-    Clears content from the temporary image and/or video directories based on flags.
+    Clears content from temp directories, respecting files that are awaiting download
+    or are within their download grace period.
     """
     if not clear_images and not clear_videos:
-        return JSONResponse(
-            status_code=400,
-            content={"message": "No action taken. Please select at least one cache to clear."}
-        )
+        return JSONResponse(status_code=400, content={"message": "No action taken."})
+
+    # Get all paths that should NOT be deleted
+    active_paths = app_models.get("active_result_paths", {})
+    downloaded_paths = app_models.get("downloaded_result_paths", {})
+    protected_paths = set(active_paths.keys()) | set(downloaded_paths.keys())
+    
+    skipped_count = 0
+
+    def safe_clear_dir(path_to_clear):
+        nonlocal skipped_count
+        if not os.path.exists(path_to_clear):
+            return
+        
+        for dirpath, dirnames, filenames in os.walk(path_to_clear):
+            for f in filenames:
+                file_path = os.path.join(dirpath, f)
+                # Convert absolute disk path to the server-relative path used in tracking
+                relative_path = f"/static_results/{os.path.relpath(file_path, 'temp').replace(os.path.sep, '/')}"
+                
+                if relative_path in protected_paths:
+                    print(f"[CACHE_CLEAR] SKIPPING: {relative_path} is protected.")
+                    skipped_count += 1
+                else:
+                    try:
+                        os.unlink(file_path)
+                    except Exception as e:
+                        print(f"Failed to delete file {file_path}. Reason: {e}")
+            
+            # This part is for cleaning up empty subdirectories after files are deleted
+            for d in dirnames:
+                dir_to_check = os.path.join(dirpath, d)
+                try:
+                    if not os.listdir(dir_to_check):
+                        os.rmdir(dir_to_check)
+                except OSError:
+                    pass # Directory is not empty, which is fine
+
     try:
         if clear_images:
-            clear_dir_content(TEMP_DIRS["images"])
+            safe_clear_dir(TEMP_DIRS["images"])
         if clear_videos:
-            clear_dir_content(TEMP_DIRS["videos"])
-            
-        cleared = []
-        if clear_images: cleared.append("image")
-        if clear_videos: cleared.append("video")
+            safe_clear_dir(TEMP_DIRS["videos"])
         
-        return JSONResponse(
-            status_code=200, 
-            content={"message": f"Successfully cleared { ' and '.join(cleared) } cache."}
-        )
+        message = "Cache clearing complete."
+        if skipped_count > 0:
+            plural = "file" if skipped_count == 1 else "files"
+            message += f" Skipped {skipped_count} {plural} awaiting download."
+
+        return JSONResponse(status_code=200, content={"message": message})
     except Exception as e:
         print(f"Error clearing cache: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to clear cache: {e}")
+
+@router.post("/api/confirm_download", tags=["cache_management"])
+async def confirm_download(request: ConfirmDownloadRequest):
+    """
+    Confirms that a download for a result file has been initiated by the user.
+    This moves the file path from the 'active' tracker to the 'downloaded' tracker
+    with a timestamp, starting the countdown for its eventual cleanup.
+    """
+    result_path = request.result_path
+    active_paths = app_models.get("active_result_paths", {})
+    downloaded_paths = app_models.get("downloaded_result_paths", {})
+    
+    if result_path in active_paths:
+        # Move from active to downloaded with a timestamp
+        del active_paths[result_path]
+        downloaded_paths[result_path] = time.time()
+        print(f"[CACHE_TRACKER] Confirmed download for '{result_path}'. Moved to timed cleanup queue.")
+        return JSONResponse(status_code=200, content={"message": "Download confirmed and queued for cleanup."})
+    elif result_path in downloaded_paths:
+        # This can happen if user clicks download multiple times
+        return JSONResponse(status_code=200, content={"message": "Download was already confirmed."})
+    else:
+        # This case should be rare but is good for robustness
+        print(f"[CACHE_TRACKER] WARNING: Received download confirmation for untracked path '{result_path}'.")
+        return JSONResponse(status_code=404, content={"message": "Result path not found in active tracker."})
 
 @router.post("/api/unload_models", tags=["cache_management"])
 async def unload_models_endpoint(request: UnloadModelsRequest):

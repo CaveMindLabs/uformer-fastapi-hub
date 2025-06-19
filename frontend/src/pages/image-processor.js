@@ -23,6 +23,7 @@ const ImageProcessorPage = () => {
     const [taskId, setTaskId] = useState(null);
     const [finalDownloadFilename, setFinalDownloadFilename] = useState(''); // State to hold the definitive filename
     const [modalState, setModalState] = useState({ isOpen: false, content: '' }); // Modal state for this page
+    const [isDownloaded, setIsDownloaded] = useState(false); // New state to track download status
 
     const cleanupPolling = () => {
         if (pollIntervalRef.current) {
@@ -37,6 +38,7 @@ const ImageProcessorPage = () => {
         setIsProcessing(false);
         setTaskId(null);
         setFinalDownloadFilename('');
+        setIsDownloaded(false); // Reset the download button state
         selectedImageFile.current = null;
         if (uploadAreaRef.current) uploadAreaRef.current.style.borderColor = '#ccc';
         setStatusText("Please select an image file. Supports: jpeg, png, gif, webp, .arw, .nef, .cr2, .dng.");
@@ -109,10 +111,32 @@ const ImageProcessorPage = () => {
             link.parentNode.removeChild(link);
             window.URL.revokeObjectURL(url);
             
-            setStatusText(originalStatus); // Restore the status text
+            // --- Confirm Download with Backend and Update UI ---
+            try {
+                const relativePath = new URL(processedImageSrc).pathname;
+                await fetch('http://127.0.0.1:8000/api/confirm_download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ result_path: relativePath })
+                });
+                setIsDownloaded(true); // Set button to "Downloaded" state
+                setStatusText("Download initiated successfully.");
+            } catch (apiError) {
+                console.error("Failed to confirm download with API:", apiError);
+                // The download still worked for the user, so we don't show a scary error.
+                // We just log it and don't disable the button, allowing them to try again.
+                setStatusText("Download initiated, but failed to confirm with server.");
+            }
+
         } catch (error) {
             console.error("Download failed:", error);
-            setModalState({ isOpen: true, content: `Download failed: ${error.message}` });
+            // Use the full modal state to trigger the correct error appearance
+            setModalState({ 
+                isOpen: true, 
+                title: 'Download Error', 
+                status: 'error',
+                content: `Download failed: ${error.message}. The file may have been cleared from the server cache.`
+            });
             setStatusText(`Error: Download failed.`);
         }
     };
@@ -123,6 +147,9 @@ const ImageProcessorPage = () => {
             return;
         }
 
+        // --- FIX: Reset download state for the new processing job ---
+        setIsDownloaded(false);
+        // ---------------------------------------------------------
         setIsProcessing(true);
         setStatusText("Uploading and starting task...");
         setProcessedImageSrc(null); // Clear previous result
@@ -339,12 +366,15 @@ const ImageProcessorPage = () => {
                         `}</style>
                         <div className="image-header">
                             <h3 className="enhanced-header-text">Enhanced Image</h3>
-                            <a id="downloadBtn" 
-                               href={processedImageSrc || '#'} 
-                               className={`enhanced-style ${!processedImageSrc ? 'hidden' : ''}`} 
-                               onClick={handleDownload}>
-                                Download
-                            </a>
+                            <button 
+                                id="downloadBtn" 
+                                className={`enhanced-style ${!processedImageSrc ? 'hidden' : ''}`} 
+                                onClick={!isDownloaded ? handleDownload : null}
+                                disabled={isDownloaded}
+                                style={isDownloaded ? { backgroundColor: '#2e8b57', color: 'white', cursor: 'default', borderColor: '#2e8b57' } : {}}
+                            >
+                                {isDownloaded ? 'Downloaded' : 'Download'}
+                            </button>
                         </div>
                         <div className="image-player-wrapper">
                             <img id="processedImage" ref={processedImageRef} src={processedImageSrc} className={`image-display ${!processedImageSrc ? 'hidden' : ''}`} alt="Processed" />

@@ -144,8 +144,14 @@ def run_image_enhancement_task(
             f.write(img_byte_arr.getvalue())
         
         relative_path = os.path.relpath(processed_filepath, "temp").replace("\\", "/")
-        print(f"[BG-TASK:{task_id}] Completed. Result at: {relative_path}")
-        tasks_db[task_id] = {"status": "completed", "result_path": f"/static_results/{relative_path}"}
+        full_result_path = f"/static_results/{relative_path}"
+        print(f"[BG-TASK:{task_id}] Completed. Result at: {full_result_path}")
+        
+        # Add the result to the active tracker, awaiting download confirmation
+        active_paths_tracker = models["active_result_paths"]
+        active_paths_tracker[full_result_path] = True
+
+        tasks_db[task_id] = {"status": "completed", "result_path": full_result_path}
 
     except Exception as e:
         print(f"[BG-TASK:{task_id}] ERROR: Failed to process image: {e}")
