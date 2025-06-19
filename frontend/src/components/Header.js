@@ -1,6 +1,7 @@
 /* frontend/src/components/Header.js */
 import React, { useState, useEffect, useCallback, useRef, useImperativeHandle } from 'react';
 import Link from 'next/link';
+import Modal from './Modal'; // Import the new Modal component
 
 // Memoized static components to prevent re-rendering when the parent state changes.
 const NavBar = React.memo(({ activePage }) => (
@@ -25,6 +26,7 @@ TitleBlock.displayName = 'TitleBlock';
 const CacheManager = React.forwardRef(({ defaultClearImages, defaultClearVideos }, ref) => {
     const [imageCacheMb, setImageCacheMb] = useState('...');
     const [videoCacheMb, setVideoCacheMb] = useState('...');
+    const [modalState, setModalState] = useState({ isOpen: false, content: '', onConfirm: null });
     const [clearImages, setClearImages] = useState(defaultClearImages);
     const [clearVideos, setClearVideos] = useState(defaultClearVideos);
     const cacheErrorStateRef = useRef(false); // Ref to track error state for cache status
@@ -64,23 +66,44 @@ const CacheManager = React.forwardRef(({ defaultClearImages, defaultClearVideos 
     // now calls updateStatus directly via the ref.
 
     const handleClear = async () => {
-        if (!confirm(`Are you sure you want to clear the selected cache(s)?`)) return;
-        try {
-            const url = new URL('http://127.0.0.1:8000/api/clear_cache');
-            url.searchParams.append('clear_images', clearImages);
-            url.searchParams.append('clear_videos', clearVideos);
-            const response = await fetch(url, { method: 'POST' });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.detail || 'Failed to clear cache.');
-            alert(result.message || 'Cache cleared successfully!');
-            await updateStatus();
-        } catch (error) {
-            alert(`An error occurred: ${error.message}`);
-        }
+        setModalState({
+            isOpen: true,
+            title: 'Confirm Cache Clearing',
+            content: 'Are you sure you want to clear the selected temporary file caches?',
+            onConfirm: async () => {
+                try {
+                    const url = new URL('http://127.0.0.1:8000/api/clear_cache');
+                    url.searchParams.append('clear_images', clearImages);
+                    url.searchParams.append('clear_videos', clearVideos);
+                    const response = await fetch(url, { method: 'POST' });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.detail || 'Failed to clear cache.');
+                    
+                    // Show a success alert
+                    setModalState({ isOpen: true, title: 'Success', content: result.message || 'Cache cleared successfully!', onConfirm: null, showCancel: false, confirmText: 'OK' });
+                    await updateStatus();
+                } catch (error) {
+                    // Show an error alert
+                    setModalState({ isOpen: true, title: 'Error', content: `An error occurred: ${error.message}`, onConfirm: null, showCancel: false, confirmText: 'OK' });
+                }
+            }
+        });
     };
+
+    const closeModal = () => setModalState({ ...modalState, isOpen: false });
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', minWidth: '150px' }}>
+            <Modal
+                isOpen={modalState.isOpen}
+                onClose={closeModal}
+                onConfirm={modalState.onConfirm}
+                title={modalState.title}
+                confirmText={modalState.confirmText}
+                showCancel={modalState.showCancel}
+            >
+                {modalState.content}
+            </Modal>
             <style jsx>{`
                 #clearCacheBtn:not(:disabled):hover {
                     background-color: #e05252;
@@ -112,6 +135,7 @@ CacheManager.displayName = 'CacheManager'; // for better debugging
 const VRAMManager = React.forwardRef((props, ref) => {
     const [loadedModels, setLoadedModels] = useState([]);
     const [isVramControlVisible, setIsVramControlVisible] = useState(false);
+    const [modalState, setModalState] = useState({ isOpen: false, content: '', onConfirm: null });
     const [selectedModelsToClear, setSelectedModelsToClear] = useState(new Set());
     const vramErrorStateRef = useRef(false);
 
@@ -176,24 +200,37 @@ const VRAMManager = React.forwardRef((props, ref) => {
     const handleClearModels = async (modelsToClear = []) => {
         const isClearingAll = modelsToClear.length === 0;
         const modelListStr = Array.from(modelsToClear).join(', ');
-        const confirmMsg = isClearingAll
-            ? "Are you sure you want to unload ALL models from VRAM? This may cause a delay on subsequent requests."
-            : `Are you sure you want to unload the selected models (${modelListStr}) from VRAM?`;
-        if (!confirm(confirmMsg)) return;
 
-        try {
-            const response = await fetch('http://127.0.0.1:8000/api/unload_models', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ model_names: modelsToClear })
-            });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.detail || 'Failed to unload models.');
-            alert(result.message || 'Models unloaded successfully!');
-            await updateStatus(); // Force immediate refresh
-        } catch (error) {
-            alert(`An error occurred while unloading models: ${error.message}`);
+        let confirmMsg;
+        if (isClearingAll) {
+            confirmMsg = "Are you sure you want to unload all available models from VRAM? This may cause a delay on subsequent requests.";
+        } else if (modelsToClear.length === 1) {
+            confirmMsg = `Are you sure you want to unload the selected model (${modelListStr}) from VRAM?`;
+        } else {
+            confirmMsg = `Are you sure you want to unload the selected models (${modelListStr}) from VRAM?`;
         }
+        
+        setModalState({
+            isOpen: true,
+            title: 'Confirm VRAM Clearing',
+            content: confirmMsg,
+            onConfirm: async () => {
+                try {
+                    const response = await fetch('http://127.0.0.1:8000/api/unload_models', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ model_names: modelsToClear })
+                    });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.detail || 'Failed to unload models.');
+                    
+                    setModalState({ isOpen: true, title: 'Success', content: result.message || 'Models unloaded successfully!', onConfirm: null, showCancel: false, confirmText: 'OK' });
+                    await updateStatus(); // Force immediate refresh
+                } catch (error) {
+                    setModalState({ isOpen: true, title: 'Error', content: `An error occurred while unloading models: ${error.message}`, onConfirm: null, showCancel: false, confirmText: 'OK' });
+                }
+            }
+        });
     };
 
     if (!isVramControlVisible) {
@@ -213,8 +250,20 @@ const VRAMManager = React.forwardRef((props, ref) => {
     
     const isAnyModelLoaded = loadedModels.some(m => m.loaded);
 
+    const closeModal = () => setModalState({ ...modalState, isOpen: false });
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minWidth: '200px' }}>
+            <Modal
+                isOpen={modalState.isOpen}
+                onClose={closeModal}
+                onConfirm={modalState.onConfirm}
+                title={modalState.title}
+                confirmText={modalState.confirmText}
+                showCancel={modalState.showCancel}
+            >
+                {modalState.content}
+            </Modal>
             <style jsx>{`
                 .vram-button { padding: 6px 10px; font-size: 0.85rem; border: none; border-radius: 5px; cursor: pointer; transition: background-color 0.2s, filter 0.2s; }
                 .vram-button.clear-selected { background-color: #f0e68c; color: #333; }

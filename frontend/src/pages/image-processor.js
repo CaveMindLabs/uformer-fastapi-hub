@@ -1,6 +1,7 @@
 /* frontend/src/pages/image-processor.js */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Layout from '../components/Layout'; // Import the Layout component
+import Modal from '../components/Modal'; // Import the Modal component
 
 const ImageProcessorPage = () => {
     // --- Refs for DOM Elements & Non-State Data ---
@@ -21,6 +22,7 @@ const ImageProcessorPage = () => {
     const [processedImageSrc, setProcessedImageSrc] = useState(null);
     const [taskId, setTaskId] = useState(null);
     const [finalDownloadFilename, setFinalDownloadFilename] = useState(''); // State to hold the definitive filename
+    const [modalState, setModalState] = useState({ isOpen: false, content: '' }); // Modal state for this page
 
     const cleanupPolling = () => {
         if (pollIntervalRef.current) {
@@ -110,7 +112,8 @@ const ImageProcessorPage = () => {
             setStatusText(originalStatus); // Restore the status text
         } catch (error) {
             console.error("Download failed:", error);
-            setStatusText(`Error: Download failed. ${error.message}`);
+            setModalState({ isOpen: true, content: `Download failed: ${error.message}` });
+            setStatusText(`Error: Download failed.`);
         }
     };
 
@@ -264,8 +267,19 @@ const ImageProcessorPage = () => {
         defaultClearVideos: false
     };
 
+    const closeModal = () => setModalState({ isOpen: false, content: '' });
+
     return (
         <Layout headerProps={headerProps}>
+            <Modal
+                isOpen={modalState.isOpen}
+                onClose={closeModal}
+                title="Error"
+                confirmText="OK"
+                showCancel={false}
+            >
+                {modalState.content}
+            </Modal>
             <div className="sidebar">
                 <h2>Image Controls</h2>
                 <div className="control-group" id="taskControlGroup">
