@@ -30,6 +30,7 @@ async def lifespan(app: FastAPI):
     print(f"Using device: {device}")
     app_models["device"] = device # Store device in shared state
     app_models["tasks_db"] = {} # Initialize shared dictionary for background task status
+    app_models["models_in_use"] = {} # Initialize reference counter for models in use
 
     # Determine model loading strategy from environment variable
     load_all_on_startup = os.getenv("LOAD_ALL_MODELS_ON_STARTUP", "True").lower() == "true"

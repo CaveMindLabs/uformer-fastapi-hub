@@ -50,7 +50,15 @@ def run_image_enhancement_task(
     The actual, long-running image processing logic that runs in the background.
     """
     tasks_db = models["tasks_db"]
+    models_in_use = models["models_in_use"]
+
     try:
+        # --- Reference Counting: Increment ---
+        # Increment the counter for the model we are about to use.
+        models_in_use[model_name] = models_in_use.get(model_name, 0) + 1
+        print(f"[REF_COUNT] INCREMENT: Model '{model_name}' in use count is now {models_in_use[model_name]}.")
+        # ------------------------------------
+
         tasks_db[task_id] = {"status": "processing", "progress": 0, "message": "Model and data loaded. Starting enhancement."}
         uformer_model = get_model_by_name(model_name=model_name, models=models)
         device = models["device"]
@@ -134,6 +142,13 @@ def run_image_enhancement_task(
         print(f"[BG-TASK:{task_id}] ERROR: Failed to process image: {e}")
         traceback.print_exc()
         tasks_db[task_id] = {"status": "failed", "error": f"An unexpected error occurred: {e}"}
+    finally:
+        # --- Reference Counting: Decrement ---
+        # Ensure the counter is decremented whether the task succeeds or fails.
+        if model_name in models_in_use:
+            models_in_use[model_name] = max(0, models_in_use.get(model_name, 0) - 1)
+            print(f"[REF_COUNT] DECREMENT: Model '{model_name}' in use count is now {models_in_use[model_name]}.")
+        # ------------------------------------
 
 @router.post("/api/generate_preview", tags=["image_file_processing"])
 async def generate_preview(image_file: UploadFile = File(...)):

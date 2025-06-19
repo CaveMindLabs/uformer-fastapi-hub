@@ -102,33 +102,54 @@ async def clear_cache(clear_images: bool = True, clear_videos: bool = True):
 async def unload_models_endpoint(request: UnloadModelsRequest):
     """
     Unloads specified Uformer models from VRAM. If the 'model_names' list is empty,
-    all currently loaded models will be unloaded and the CUDA cache cleared.
+    all currently loaded models will be unloaded.
+    This operation will not unload models that are currently in use by background tasks.
     """
+    models_in_use = app_models.get("models_in_use", {})
     try:
         model_names_to_unload = request.model_names
-        if model_names_to_unload:
-            print(f"Attempting to unload specific models: {model_names_to_unload}")
-            device = app_models.get("device", torch.device("cpu"))
-            unloaded_count = 0
-            for model_name in model_names_to_unload:
-                # Make this logic consistent: only unload if it's a defined model.
-                if model_name in app_models and model_name in model_definitions_dict:
-                    del app_models[model_name]
-                    unloaded_count += 1
-                    print(f"Model '{model_name}' unloaded.")
-            if device.type == 'cuda':
-                torch.cuda.empty_cache() # Clear CUDA cache after any unload
-                print("CUDA cache cleared.")
+        device = app_models.get("device", torch.device("cpu"))
+        unloaded_models = []
+        skipped_models = []
 
-            if unloaded_count == 0:
-                return JSONResponse(status_code=200, content={"message": "No specified models were loaded or eligible for unloading."})
-            else:
-                return JSONResponse(status_code=200, content={"message": f"Successfully unloaded {unloaded_count} specified Uformer models. CUDA cache cleared."})
-        else:
-            # "Clear all" logic when an empty list is sent
+        if not model_names_to_unload:
+            # "Clear All" logic: target all known, loaded models
             print("Received request to unload all models.")
-            unload_all_models_from_memory(app_models)
-            return JSONResponse(status_code=200, content={"message": "All Uformer models unloaded from VRAM and CUDA cache cleared."})
+            # Create a list of all currently loaded models that are defined in our system
+            target_models = [name for name in model_definitions_dict.keys() if name in app_models]
+        else:
+            # "Clear Selected" logic
+            print(f"Attempting to unload specific models: {model_names_to_unload}")
+            target_models = model_names_to_unload
+
+        for model_name in target_models:
+            # Check if the model is currently in use.
+            if models_in_use.get(model_name, 0) > 0:
+                print(f"Skipping unload for '{model_name}': model is in use (count: {models_in_use.get(model_name, 0)}).")
+                skipped_models.append(model_name)
+                continue
+            
+            # Check if the model is actually loaded and is a defined model.
+            if model_name in app_models and model_name in model_definitions_dict:
+                del app_models[model_name]
+                unloaded_models.append(model_name)
+                print(f"Model '{model_name}' unloaded.")
+
+        if unloaded_models and device.type == 'cuda':
+            torch.cuda.empty_cache()
+            print("CUDA cache cleared.")
+        
+        message = ""
+        if unloaded_models:
+            message += f"Successfully unloaded {len(unloaded_models)} model(s): {', '.join(unloaded_models)}. "
+        if skipped_models:
+            message += f"Could not unload {len(skipped_models)} model(s) as they are in use: {', '.join(skipped_models)}."
+        if not message:
+            # This handles cases where no models were selected, or selected models were not loaded.
+            message = "No models were eligible for unloading."
+
+        return JSONResponse(status_code=200, content={"message": message})
+
     except Exception as e:
         print(f"Error unloading models: {e}")
         traceback.print_exc()
