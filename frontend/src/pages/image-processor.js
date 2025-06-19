@@ -1,51 +1,175 @@
 /* frontend/src/pages/image-processor.js */
-import React, { useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Layout from '../components/Layout'; // Import the Layout component
 
 const ImageProcessorPage = () => {
-    // --- Refs for DOM Elements ---
+    // --- Refs for DOM Elements & Non-State Data ---
     const imageUploadInputRef = useRef(null);
     const uploadAreaRef = useRef(null);
     const originalImageRef = useRef(null);
     const processedImageRef = useRef(null);
-    const downloadBtnRef = useRef(null);
-    const statusSpanRef = useRef(null);
     const taskSelectRef = useRef(null);
     const modelSelectRef = useRef(null);
     const patchCheckboxRef = useRef(null);
+    const selectedImageFile = useRef(null); // The raw file object
+    const pollIntervalRef = useRef(null); // To store the polling interval ID
 
-    // Using a ref to hold the selected file, as it doesn't need to trigger re-renders
-    const selectedImageFile = useRef(null);
+    // --- React State for UI Control ---
+    const [statusText, setStatusText] = useState("Please select an image file. Supports: jpeg, png, gif, webp, .arw, .nef, .cr2, .dng.");
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [originalImageSrc, setOriginalImageSrc] = useState(null);
+    const [processedImageSrc, setProcessedImageSrc] = useState(null);
+    const [taskId, setTaskId] = useState(null);
 
+    const cleanupPolling = () => {
+        if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+        }
+    };
+
+    const resetUI = () => {
+        setOriginalImageSrc(null);
+        setProcessedImageSrc(null);
+        setIsProcessing(false);
+        setTaskId(null);
+        selectedImageFile.current = null;
+        if (uploadAreaRef.current) uploadAreaRef.current.style.borderColor = '#ccc';
+        setStatusText("Please select an image file. Supports: jpeg, png, gif, webp, .arw, .nef, .cr2, .dng.");
+        cleanupPolling();
+    };
+
+    const pollTaskStatus = useCallback(async (currentTaskId) => {
+        try {
+            const response = await fetch(`http://127.0.0.1:8000/api/image_status/${currentTaskId}`);
+            if (!response.ok) {
+                throw new Error(`Server returned status ${response.status}`);
+            }
+            const data = await response.json();
+
+            switch (data.status) {
+                case 'completed':
+                    cleanupPolling();
+                    setIsProcessing(false);
+                    setStatusText('Processing complete!');
+                    // Prepend the backend server URL to the relative path
+                    setProcessedImageSrc(`http://127.0.0.1:8000${data.result_path}`);
+                    break;
+                case 'failed':
+                    cleanupPolling();
+                    setIsProcessing(false);
+                    setStatusText(`Error: ${data.error || 'Processing failed.'}`);
+                    break;
+                case 'processing':
+                    setStatusText(`Processing... ${data.progress || 0}%`);
+                    break;
+                case 'pending':
+                default:
+                    setStatusText(data.message || 'Task is pending...');
+                    break;
+            }
+        } catch (error) {
+            cleanupPolling();
+            setIsProcessing(false);
+            setStatusText(`Error: Could not get task status. ${error.message}`);
+        }
+    }, []);
+
+    const handleProcessImage = async () => {
+        if (!selectedImageFile.current) {
+            setStatusText("Error: No image selected.");
+            return;
+        }
+
+        setIsProcessing(true);
+        setStatusText("Uploading and starting task...");
+        setProcessedImageSrc(null); // Clear previous result
+
+        const formData = new FormData();
+        formData.append("image_file", selectedImageFile.current);
+        formData.append("task_type", taskSelectRef.current.value);
+        formData.append("model_name", modelSelectRef.current.value);
+        formData.append("use_patch_processing", patchCheckboxRef.current.checked);
+        
+        // This non-blocking call ensures the Header can update immediately.
+        window.dispatchEvent(new CustomEvent('forceHeaderUpdate'));
+
+        try {
+            const response = await fetch('http://127.0.0.1:8000/api/process_image', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result.detail || 'Failed to start processing task.');
+            }
+            
+            const newTaskId = result.task_id;
+            setTaskId(newTaskId);
+            setStatusText("Task started. Waiting for progress...");
+
+            // Start polling
+            cleanupPolling(); // Ensure no old pollers are running
+            pollIntervalRef.current = setInterval(() => pollTaskStatus(newTaskId), 2000);
+
+        } catch (error) {
+            setIsProcessing(false);
+            setStatusText(`Error: ${error.message}. Is the backend running?`);
+        }
+    };
+    
+    const handleImageFileSelect = useCallback(async (file) => {
+        if (!file) return;
+        
+        resetUI(); // Reset everything for the new file
+        selectedImageFile.current = file;
+
+        setStatusText(`Loading preview for "${file.name}"...`);
+
+        try {
+            let previewUrl;
+            // Generate a server-side preview for RAW files
+            const formData = new FormData();
+            formData.append("image_file", file);
+            const response = await fetch('http://127.0.0.1:8000/api/generate_preview', {
+                method: 'POST',
+                body: formData
+            });
+            if (!response.ok) throw new Error('Server could not generate preview.');
+            const blob = await response.blob();
+            previewUrl = URL.createObjectURL(blob);
+
+            setOriginalImageSrc(previewUrl);
+            setStatusText(`Selected: "${file.name}". Ready to process.`);
+        } catch (error) {
+            setStatusText(`Error: Could not load preview for "${file.name}".`);
+            setOriginalImageSrc(null);
+        }
+    }, []);
+
+
+    // --- Setup Effect (runs once) ---
     useEffect(() => {
-        // --- Get current elements from refs ---
-        const imageUploadInput = imageUploadInputRef.current;
         const uploadArea = uploadAreaRef.current;
-        const originalImage = originalImageRef.current;
-        const processedImage = processedImageRef.current;
-        const downloadBtn = downloadBtnRef.current;
-        const statusSpan = statusSpanRef.current;
         const taskSelect = taskSelectRef.current;
         const modelSelect = modelSelectRef.current;
-        const patchCheckbox = patchCheckboxRef.current;
-
-        // --- Event Listeners for Controls ---
-        const selectImageBtn = document.getElementById('selectImageBtn');
-        const processImageBtn = document.getElementById('processImageBtn');
-        selectImageBtn.onclick = () => imageUploadInput.click();
-        imageUploadInput.onchange = (event) => handleImageFile(event.target.files[0]);
-        uploadArea.onclick = () => imageUploadInput.click();
         
-        uploadArea.ondragover = (event) => { event.preventDefault(); uploadArea.style.borderColor = '#61dafb'; };
-        uploadArea.ondragleave = (event) => { event.preventDefault(); uploadArea.style.borderColor = '#ccc'; };
-        uploadArea.ondrop = (event) => {
-            event.preventDefault();
+        // Drag and Drop listeners
+        const preventDefaults = (e) => { e.preventDefault(); e.stopPropagation(); };
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, preventDefaults, false);
+        });
+        uploadArea.addEventListener('dragover', () => uploadArea.style.borderColor = '#61dafb');
+        uploadArea.addEventListener('dragleave', () => uploadArea.style.borderColor = '#ccc');
+        uploadArea.addEventListener('drop', (e) => {
             uploadArea.style.borderColor = '#ccc';
-            if (event.dataTransfer.files && event.dataTransfer.files[0]) {
-                handleImageFile(event.dataTransfer.files[0]);
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                handleImageFileSelect(e.dataTransfer.files[0]);
             }
-        };
-
+        });
+        
+        // Model select population logic
         const modelsByTask = {
             denoise: [ { value: 'denoise_b', text: 'Uformer-B (High Quality)' }, { value: 'denoise_16', text: 'Uformer-16 (Fast)' } ],
             deblur: [ { value: 'deblur_b', text: 'Uformer-B (Deblur)' } ]
@@ -53,147 +177,38 @@ const ImageProcessorPage = () => {
 
         function populateModelSelect(taskType) {
             modelSelect.innerHTML = '';
-            const models = modelsByTask[taskType];
-            if (models) {
-                models.forEach(model => {
-                    const option = document.createElement('option');
-                    option.value = model.value;
-                    option.textContent = model.text;
-                    if (taskType === 'denoise' && model.value === 'denoise_16') option.selected = true;
-                    else if (models.length === 1) option.selected = true;
-                    modelSelect.appendChild(option);
-                });
-            }
+            modelsByTask[taskType].forEach(model => {
+                const option = document.createElement('option');
+                option.value = model.value;
+                option.textContent = model.text;
+                if (taskType === 'denoise' && model.value === 'denoise_16') option.selected = true;
+                modelSelect.appendChild(option);
+            });
         }
         
         taskSelect.addEventListener('change', () => populateModelSelect(taskSelect.value));
-        
-        async function handleImageFile(file) {
-            if (!file) return;
-            selectedImageFile.current = file;
-            const isRaw = file.name.toLowerCase().endsWith('.arw') || file.name.toLowerCase().endsWith('.nef') || file.name.toLowerCase().endsWith('.cr2') || file.name.toLowerCase().endsWith('.dng');
-
-            originalImage.classList.remove('hidden');
-            uploadArea.classList.add('hidden');
-            statusSpan.textContent = `Loading preview for "${file.name}"...`;
-            statusSpan.classList.remove('error');
-            originalImage.src = "";
-
-            try {
-                let previewUrl;
-                if (isRaw) {
-                    const formData = new FormData();
-                    formData.append("image_file", file);
-                    const response = await fetch('http://127.0.0.1:8000/api/generate_preview', { method: 'POST', body: formData });
-                    if (!response.ok) throw new Error('Server could not generate preview.');
-                    const blob = await response.blob();
-                    previewUrl = URL.createObjectURL(blob);
-                } else {
-                    previewUrl = URL.createObjectURL(file);
-                }
-                originalImage.src = previewUrl;
-                statusSpan.textContent = `Selected: "${file.name}". Ready to process.`;
-                processImageBtn.disabled = false;
-            } catch (error) {
-                console.error("Preview Error:", error);
-                statusSpan.textContent = `Error: Could not load preview for "${file.name}".`;
-                statusSpan.classList.add('error');
-                originalImage.classList.add('hidden');
-                uploadArea.classList.remove('hidden');
-                processImageBtn.disabled = true;
-            }
-
-            processedImage.src = "";
-            processedImage.classList.add('hidden');
-            downloadBtn.classList.add('hidden');
-        }
-        
-        processImageBtn.onclick = async () => {
-            if (!selectedImageFile.current) {
-                statusSpan.textContent = "Error: No image selected.";
-                statusSpan.classList.add('error');
-                return;
-            }
-
-            statusSpan.textContent = `Processing "${selectedImageFile.current.name}"...`;
-            statusSpan.classList.remove('error');
-            processImageBtn.disabled = true;
-            downloadBtn.classList.add('hidden');
-            processedImage.classList.add('hidden');
-            
-            const formData = new FormData();
-            formData.append("image_file", selectedImageFile.current);
-            formData.append("task_type", taskSelect.value);
-            formData.append("model_name", modelSelect.value);
-            formData.append("use_patch_processing", patchCheckbox.checked);
-
-            // Dispatch an event to tell the header to update its status.
-            window.dispatchEvent(new CustomEvent('forceHeaderUpdate'));
-
-            // Use a brief timeout. This allows the UI (especially the Header) to re-render
-            // with the "model loading" status *before* the main thread is blocked by the fetch call.
-            // This is the key to solving the race condition.
-            setTimeout(async () => {
-                try {
-                    const response = await fetch('http://127.0.0.1:8000/api/process_image', { method: 'POST', body: formData });
-                    if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ detail: 'Server returned an unreadable error.' }));
-                    throw new Error(errorData.detail || `Server responded with status ${response.status}`);
-                }
-                const blob = await response.blob();
-                const imageUrl = URL.createObjectURL(blob);
-                processedImage.src = imageUrl;
-                processedImage.classList.remove('hidden');
-                downloadBtn.href = imageUrl;
-                downloadBtn.download = `enhanced_${taskSelect.value}_${selectedImageFile.current.name}`;
-                downloadBtn.classList.remove('hidden');
-                statusSpan.textContent = "Image processing complete!";
-            } catch (error) {
-                statusSpan.classList.add('error');
-                let errorMessage = error.message || 'An unknown error occurred.';
-                if (error.detail && Array.isArray(error.detail)) {
-                    errorMessage = error.detail.map(d => `${d.loc.join(' -> ')}: ${d.msg}`).join('; ');
-                }
-                    statusSpan.textContent = `Error: ${errorMessage}. Is the backend running?`;
-                } finally {
-                    processImageBtn.disabled = false;
-                }
-            }, 50); // A small 50ms delay is sufficient to ensure the UI updates.
-        };
-
-        function setupPanAndZoom() {
-            [originalImage, processedImage].forEach(img => {
-                let scale = 1, panning = false, pointX = 0, pointY = 0, startX = 0, startY = 0;
-                const resetTransform = () => { scale = 1; pointX = 0; pointY = 0; img.style.transform = `translate(${pointX}px, ${pointY}px) scale(${scale})`; img.style.transformOrigin = `0 0`; };
-                const applyTransform = () => { img.style.transform = `translate(${pointX}px, ${pointY}px) scale(${scale})`; };
-                img.addEventListener('dblclick', resetTransform);
-                img.parentElement.addEventListener('wheel', (e) => {
-                    e.preventDefault(); if (img.classList.contains('hidden')) return;
-                    const rect = img.getBoundingClientRect();
-                    const x = (e.clientX - rect.left) / scale; const y = (e.clientY - rect.top) / scale;
-                    const delta = e.deltaY > 0 ? 0.9 : 1.1; const newScale = Math.max(1, scale * delta);
-                    pointX += (x - x / (newScale / scale)) * newScale; pointY += (y - y / (newScale / scale)) * newScale;
-                    scale = newScale; applyTransform();
-                });
-                img.addEventListener('mousedown', (e) => {
-                    e.preventDefault(); if (img.classList.contains('hidden')) return;
-                    panning = true; img.classList.add('panning');
-                    startX = e.clientX - pointX; startY = e.clientY - pointY;
-                });
-                window.addEventListener('mouseup', () => { panning = false; img.classList.remove('panning'); });
-                window.addEventListener('mousemove', (e) => { if (!panning) return; e.preventDefault(); pointX = e.clientX - startX; pointY = e.clientY - startY; applyTransform(); });
-                new MutationObserver(resetTransform).observe(img, { attributeFilter: ['src'] });
-            });
-        }
-
-        // --- Initial Load Logic ---
         populateModelSelect(taskSelect.value);
-        setupPanAndZoom();
 
-    }, []); // Empty array ensures this runs only once on mount
+        // Pan and Zoom setup
+        [originalImageRef.current, processedImageRef.current].forEach(img => {
+            if (!img) return;
+            let scale = 1, panning = false, pointX = 0, pointY = 0, startX = 0, startY = 0;
+            const container = img.parentElement;
+            const resetTransform = () => { scale = 1; pointX = 0; pointY = 0; img.style.transform = `translate(0px, 0px) scale(1)`; };
+            const applyTransform = () => { img.style.transform = `translate(${pointX}px, ${pointY}px) scale(${scale})`; };
+            img.addEventListener('dblclick', resetTransform);
+            container.addEventListener('wheel', e => { e.preventDefault(); if (!img.src) return; const rect = img.getBoundingClientRect(); const x = (e.clientX - rect.left) / scale; const y = (e.clientY - rect.top) / scale; const delta = e.deltaY > 0 ? 0.9 : 1.1; const newScale = Math.max(1, scale * delta); pointX += (x - x / (newScale / scale)) * newScale; pointY += (y - y / (newScale / scale)) * newScale; scale = newScale; applyTransform(); });
+            img.addEventListener('mousedown', e => { e.preventDefault(); if (!img.src) return; panning = true; img.classList.add('panning'); startX = e.clientX - pointX; startY = e.clientY - pointY; });
+            window.addEventListener('mouseup', () => { panning = false; img.classList.remove('panning'); });
+            window.addEventListener('mousemove', e => { if (!panning) return; e.preventDefault(); pointX = e.clientX - startX; pointY = e.clientY - startY; applyTransform(); });
+            new MutationObserver(resetTransform).observe(img, { attributeFilter: ['src'] });
+        });
+
+        // Cleanup polling on component unmount
+        return () => cleanupPolling();
+    }, [handleImageFileSelect]);
 
     const headerProps = {
-        title: "NocturaVision - Image File Processor",
         activePage: "image",
         pageTitle: "Image File Enhancement",
         defaultClearImages: true,
@@ -223,31 +238,33 @@ const ImageProcessorPage = () => {
             </div>
             <div className="main-content">
                 <div className="actions-bar">
-                    <button id="processImageBtn" disabled>Process Image</button>
-                    <p id="status" ref={statusSpanRef}>Please select an image file. Supports: jpeg, png, gif, webp, .arw, .nef, .cr2, .dng.</p>
+                    <button id="processImageBtn" onClick={handleProcessImage} disabled={!originalImageSrc || isProcessing}>
+                        {isProcessing ? 'Processing...' : 'Process Image'}
+                    </button>
+                    <p id="status" className={statusText.toLowerCase().includes('error') ? 'error' : ''}>{statusText}</p>
                 </div>
                 <div className="image-feeds-container">
                     <div className="image-box">
                         <div className="image-header">
                             <h3>Original Image</h3>
-                            <input type="file" id="imageUpload" ref={imageUploadInputRef} accept="image/jpeg,image/png,image/gif,image/webp,.arw,.nef,.cr2,.dng" style={{ display: 'none' }} />
-                            <button id="selectImageBtn">Select Image</button>
+                            <input type="file" id="imageUpload" ref={imageUploadInputRef} onChange={(e) => handleImageFileSelect(e.target.files[0])} accept="image/jpeg,image/png,image/gif,image/webp,.arw,.nef,.cr2,.dng" style={{ display: 'none' }} />
+                            <button id="selectImageBtn" onClick={() => imageUploadInputRef.current.click()}>Select New Image</button>
                         </div>
                         <div className="image-player-wrapper">
-                            <div id="upload-area" ref={uploadAreaRef} className="upload-area">
+                            <div id="upload-area" ref={uploadAreaRef} className={`upload-area ${originalImageSrc ? 'hidden' : ''}`} onClick={() => imageUploadInputRef.current.click()}>
                                 <p>Drag & Drop an image file here or click this area</p>
                                 <p style={{ fontSize: '0.8rem', color: '#ccc' }}>(Supports: JPG, PNG, ARW, etc.)</p>
                             </div>
-                            <img id="originalImage" ref={originalImageRef} className="image-display hidden" alt="Original Image" />
+                            <img id="originalImage" ref={originalImageRef} src={originalImageSrc} className={`image-display ${!originalImageSrc ? 'hidden' : ''}`} alt="Original" />
                         </div>
                     </div>
                     <div className="image-box">
                         <div className="image-header">
                             <h3>Enhanced Image</h3>
-                            <a id="downloadBtn" ref={downloadBtnRef} href="#" className="hidden" download>Download</a>
+                            <a id="downloadBtn" href={processedImageSrc || '#'} className={!processedImageSrc ? 'hidden' : ''} download={`enhanced_${selectedImageFile.current?.name || 'image.jpg'}`}>Download</a>
                         </div>
                         <div className="image-player-wrapper">
-                            <img id="processedImage" ref={processedImageRef} className="image-display hidden" alt="Processed Image" />
+                            <img id="processedImage" ref={processedImageRef} src={processedImageSrc} className={`image-display ${!processedImageSrc ? 'hidden' : ''}`} alt="Processed" />
                         </div>
                     </div>
                 </div>

@@ -1,6 +1,7 @@
 # noctura-uformer/backend/app/main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import os
 import torch
@@ -24,10 +25,11 @@ async def lifespan(app: FastAPI):
     - On shutdown, ensures all models are cleared from memory.
     """
     print("FastAPI application startup...")
-    
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     app_models["device"] = device # Store device in shared state
+    app_models["tasks_db"] = {} # Initialize shared dictionary for background task status
 
     # Determine model loading strategy from environment variable
     load_all_on_startup = os.getenv("LOAD_ALL_MODELS_ON_STARTUP", "True").lower() == "true"
@@ -36,20 +38,20 @@ async def lifespan(app: FastAPI):
     if load_all_on_startup:
         try:
             # Pass app_models directly for initial loading
-            await load_models(device, app_models=app_models, load_all=True) 
-            print(f"All models loaded successfully. Available: {list(k for k in app_models.keys() if k not in ['device', 'load_all_on_startup'])}")
+            await load_models(device, app_models=app_models, load_all=True)
+            print(f"All models loaded successfully. Available: {list(k for k in app_models.keys() if k not in ['device', 'load_all_on_startup', 'tasks_db'])}")
         except Exception as e:
             print(f"FATAL ERROR: Failed to load one or more Uformer models on startup: {e}")
             # Clear any partially loaded models to indicate a failed state
             for key in list(app_models.keys()):
-                if key not in ['device', 'load_all_on_startup']:
+                if key not in ['device', 'load_all_on_startup', 'tasks_db']:
                     del app_models[key]
     else:
         print("Models will be loaded on demand. Initial VRAM usage low.")
         # Pre-populate model definitions so they are ready for on-demand loading
         # This will save a bit of overhead compared to defining them every time.
         await load_models(device, app_models=app_models, load_definitions_only=True)
-        print(f"Model definitions loaded successfully. Ready for on-demand loading: {list(k for k in app_models.keys() if k not in ['device', 'load_all_on_startup'])}")
+        print(f"Model definitions loaded successfully. Ready for on-demand loading: {list(k for k in app_models.keys() if k not in ['device', 'load_all_on_startup', 'tasks_db'])}")
 
 
     yield # Application is running
@@ -57,7 +59,7 @@ async def lifespan(app: FastAPI):
     print("FastAPI application shutdown...")
     if app_models:
         # On shutdown, ensure all models are cleared from memory
-        unload_all_models_from_memory(app_models) 
+        unload_all_models_from_memory(app_models)
     print("FastAPI application shutdown complete.")
 
 
@@ -70,6 +72,13 @@ app = FastAPI(
 
 # CORS Middleware for allowing cross-origin requests
 origins = ["*"] # Allow requests from any origin for development
+
+# --- Mount Static Directory for Results ---
+# This makes the 'temp' directory available under '/static_results'
+# so the frontend can fetch processed images/videos.
+os.makedirs("temp", exist_ok=True)
+app.mount("/static_results", StaticFiles(directory="temp"), name="static_results")
+
 
 app.add_middleware(
     CORSMiddleware,
