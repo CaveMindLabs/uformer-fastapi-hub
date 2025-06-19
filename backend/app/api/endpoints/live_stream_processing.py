@@ -41,9 +41,12 @@ async def websocket_process_video(
     print("[WS-BACKEND] ==> WebSocket connection accepted.")
 
     device = models_container["device"] # Get device from the container
+    models_in_use = models_container.get("models_in_use", {}) # Get the reference counter
     patch_size = 256 # Define patch_size here
     
     prev_frame_time = 0
+    # Keep track of the last model used by this specific websocket connection
+    last_model_used_by_ws = None
     
     try:
         # We need to manually resolve get_model_by_name here because WebSocket dependencies
@@ -60,8 +63,19 @@ async def websocket_process_video(
             use_patch_processing = data.get("use_patch_processing", False)
 
             try:
-                # IMPORTANT: Call get_model_by_name directly, it is NOT an awaitable.
-                # Pass the model_name and the models_container (app_models) to it.
+                # --- Reference Counting for Live Stream ---
+                if model_name != last_model_used_by_ws:
+                    # If the model has changed, decrement the old one (if any)
+                    if last_model_used_by_ws and last_model_used_by_ws in models_in_use:
+                        models_in_use[last_model_used_by_ws] = max(0, models_in_use.get(last_model_used_by_ws, 0) - 1)
+                        print(f"[REF_COUNT] DECREMENT (WS Switch): Model '{last_model_used_by_ws}' count is now {models_in_use[last_model_used_by_ws]}.")
+                    
+                    # And increment the new one
+                    models_in_use[model_name] = models_in_use.get(model_name, 0) + 1
+                    print(f"[REF_COUNT] INCREMENT (WS): Model '{model_name}' count is now {models_in_use[model_name]}.")
+                    last_model_used_by_ws = model_name
+                # ------------------------------------------
+
                 uformer_model = get_model_by_name(model_name=model_name, models=models_container)
             except HTTPException as e:
                 # If get_model_by_name raises an HTTPException (e.g., model not found/failed to load)
@@ -121,10 +135,16 @@ async def websocket_process_video(
 
     except WebSocketDisconnect as e:
         print(f"[WS-BACKEND] XXX Client disconnected. Code: {e.code}, Reason: {e.reason}")
-    except Exception as e:       
+    except Exception as e:
         print(f"[WS-BACKEND] !!! An error occurred in WebSocket: {e}")
         traceback.print_exc()
         try:
             await websocket.send_json({"error": f"Server processing error: {e}"})
         except: pass
         await websocket.close(code=1011, reason=f"Server error: {e}")
+    finally:
+        # --- Final Reference Counter Decrement on Disconnect ---
+        if last_model_used_by_ws and last_model_used_by_ws in models_in_use:
+            models_in_use[last_model_used_by_ws] = max(0, models_in_use.get(last_model_used_by_ws, 0) - 1)
+            print(f"[REF_COUNT] DECREMENT (WS Disconnect): Model '{last_model_used_by_ws}' count is now {models_in_use[last_model_used_by_ws]}.")
+        # --------------------------------------------------------
