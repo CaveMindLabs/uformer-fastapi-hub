@@ -48,7 +48,7 @@ const VideoProcessorPage = {
                 <div class="video-box">
                     <div class="video-header">
                         <h3 style="color: #f0e68c;">Enhanced Video</h3>
-                        <button id="downloadBtn" class="hidden" style="background-color: #f0e68c; color: #333;">Download</button>
+                        <button id="downloadBtn" class="hidden" style="background-color: #f0e68c; color: #333; border-color: #d8c973; font-weight: 500;">Download</button>
                     </div>
                     <div class="video-player-wrapper">
                         <video id="processedVideo" controls class="video hidden"></video>
