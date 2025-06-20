@@ -101,7 +101,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Uformer FastAPI Hub",
-    description="A FastAPI backend for high-performance image and video enhancement using the Uformer model.",
+    description="A FastAPI backend for high-performance image and video enhancement using Uformer models.",
     version="1.0.0",
     lifespan=lifespan # Attach the lifespan context manager
 )
