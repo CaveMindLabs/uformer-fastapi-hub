@@ -278,8 +278,7 @@ header {
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
-    border-radius: 5px;
-    border: 2px solid #ccc;
+    border: 1px solid #ccc;
     background-color: #20232a;
     box-sizing: border-box;
 }
@@ -287,6 +286,7 @@ header {
 .video {
     max-width: 100%;
     max-height: 100%;
+    border-radius: 5px;
 }
 
 .image-display {

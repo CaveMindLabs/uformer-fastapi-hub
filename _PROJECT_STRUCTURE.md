@@ -1,7 +1,7 @@
 ## Project Structure: 
 
 ```text
-uformer-fastapi-hub/
+
 ├── backend/
 │   ├── app/
 │   │   ├── api/

@@ -1,4 +1,4 @@
-# uformer-fastapi-hub/backend/app/api/endpoints/image_file_processing.py
+# backend/app/api/endpoints/image_file_processing.py
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, BackgroundTasks
 from fastapi.responses import Response, JSONResponse
 from PIL import Image
@@ -157,6 +157,7 @@ def run_image_enhancement_task(
         tracker_by_path[full_result_path] = {
             "status": "active",
             "task_id": task_id,
+            "file_type": "image", # Explicitly store the file type
             "created_at": current_timestamp,
             "downloaded_at": None,
             "last_heartbeat_at": current_timestamp  # Initialize with created_at

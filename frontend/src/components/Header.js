@@ -79,9 +79,36 @@ const CacheManager = React.forwardRef(({ defaultClearImages, defaultClearVideos 
                     const response = await fetch(url, { method: 'POST' });
                     const result = await response.json();
                     if (!response.ok) throw new Error(result.detail || 'Failed to clear cache.');
-                    
-                    // Show a success alert
-                    setModalState({ isOpen: true, title: 'Success', content: result.message || 'Cache cleared successfully!', onConfirm: null, showCancel: false, confirmText: 'OK' });
+
+                    const { cleared_count, skipped_count } = result;
+                    let modalTitle = 'Success';
+                    let modalStatus = 'success';
+                    let messages = [];
+
+                    if (cleared_count > 0) {
+                        const plural = cleared_count === 1 ? 'file' : 'files';
+                        messages.push(`Successfully cleared ${cleared_count} ${plural} from the cache.`);
+                    }
+
+                    if (skipped_count > 0) {
+                        const plural = skipped_count === 1 ? 'file' : 'files';
+                        messages.push(`Skipped ${skipped_count} protected ${plural} that are awaiting download.`);
+                        modalStatus = cleared_count > 0 ? 'warning' : 'error';
+                        modalTitle = cleared_count > 0 ? 'Cache Partially Cleared' : 'Cache Files in Use';
+                    }
+
+                    if (cleared_count === 0 && skipped_count === 0) {
+                         messages.push('No files were eligible for clearing.');
+                         modalTitle = 'Info';
+                    }
+
+                    const modalContent = (
+                        <div>
+                            {messages.map((msg, index) => <p key={index} style={{ margin: '0 0 10px 0', padding: 0, lineHeight: '1.4' }}>{msg}</p>)}
+                        </div>
+                    );
+
+                    setModalState({ isOpen: true, title: modalTitle, status: modalStatus, content: modalContent, onConfirm: null, showCancel: false, confirmText: 'OK' });
                     await updateStatus();
                 } catch (error) {
                     // Show an error alert

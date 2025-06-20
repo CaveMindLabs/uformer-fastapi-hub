@@ -1,4 +1,4 @@
-# uformer-fastapi-hub/backend/app/api/dependencies.py
+# backend/app/api/dependencies.py
 from fastapi import Depends, HTTPException
 import traceback
 import torch

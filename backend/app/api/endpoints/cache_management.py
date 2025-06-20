@@ -1,4 +1,4 @@
-# uformer-fastapi-hub/backend/app/api/endpoints/cache_management.py
+# backend/app/api/endpoints/cache_management.py
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -113,7 +113,8 @@ async def clear_cache(clear_images: bool = True, clear_videos: bool = True):
         
         # Condition A: Downloaded and expired
         if file_info["status"] == "downloaded" and file_info["downloaded_at"] is not None:
-            grace_period = video_grace_period if path.endswith(('.mp4', '.mov', '.avi')) else image_grace_period
+            file_type = file_info.get("file_type", "image") # Default to image for safety
+            grace_period = video_grace_period if file_type == "video" else image_grace_period
             if (current_time - file_info["downloaded_at"]) > grace_period:
                 return True
 

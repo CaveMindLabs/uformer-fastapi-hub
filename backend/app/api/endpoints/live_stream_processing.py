@@ -1,4 +1,4 @@
-# uformer-fastapi-hub/backend/app/api/endpoints/live_stream_processing.py
+# backend/app/api/endpoints/live_stream_processing.py
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException
 from typing import Dict, Any, Tuple
 import base64
