@@ -9,11 +9,12 @@ import traceback
 import torch
 import time
 from dotenv import load_dotenv
+from urllib.parse import unquote
 
 # Load environment variables to get grace periods
 load_dotenv()
 
-from app.api.dependencies import app_models, unload_all_models_from_memory # Import app_models and the new utility
+from app.api.dependencies import app_models
 from app.api.dependencies import model_definitions_dict # Import this here
 
 class UnloadModelsRequest(BaseModel):
@@ -103,6 +104,9 @@ async def clear_cache(clear_images: bool = True, clear_videos: bool = True):
         image_grace_period = float(os.getenv("IMAGE_DOWNLOAD_GRACE_PERIOD_MINUTES", 60)) * 60
         video_grace_period = float(os.getenv("VIDEO_DOWNLOAD_GRACE_PERIOD_MINUTES", 180)) * 60
         heartbeat_timeout = float(os.getenv("HEARTBEAT_TIMEOUT_MINUTES", 10)) * 60
+        print(f"\nimage_grace_period = {image_grace_period}")
+        print(f"video_grace_period = {video_grace_period}")
+        print(f"heartbeat_timeout = {heartbeat_timeout}\n")
     except ValueError:
         raise HTTPException(status_code=500, detail="Invalid timer value in .env file.")
 
@@ -195,7 +199,9 @@ async def confirm_download(request: ConfirmDownloadRequest):
     Confirms that a download for a result file has been initiated.
     This updates the file's status to 'downloaded' and sets the download timestamp.
     """
-    result_path = request.result_path
+    # --- FIX: Decode the incoming path to handle URL-encoded characters ---
+    result_path = unquote(request.result_path)
+    # --- END FIX ---
     tracker_by_path = app_models.get("tracker_by_path", {})
     
     if result_path in tracker_by_path:

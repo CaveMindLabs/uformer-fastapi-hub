@@ -10,7 +10,7 @@ const config = {
     // Polling Intervals (in milliseconds)
     HEADER_STATUS_POLL_INTERVAL_MS: 2000,          // For VRAM and Cache status in the Header.
     IMAGE_STATUS_POLL_INTERVAL_MS: 2000,           // For checking image processing progress.
-    VIDEO_STATUS_POLL_INTERVAL_MS: 3000,           // For checking video processing progress (for future use).
+    VIDEO_STATUS_POLL_INTERVAL_MS: 3000,           // For checking video processing progress.
     HEARTBEAT_POLL_INTERVAL_MS: 5 * 60 * 1000,     // 5 minutes, for the cache heartbeat signal.
 };
 

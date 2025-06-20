@@ -58,14 +58,18 @@ logger = logging.getLogger(__name__)
 # ]
 
 FILES_TO_EXTRACT = [
-    'backend/app/main.py',
-    'frontend/src/pages/index.js',
-    'frontend/src/pages/image-processor.js',
-    'frontend/src/pages/video-processor.js',
-    'frontend/src/components/Header.js',
-    'frontend/src/components/Modal.js',
-    'frontend/src/config.js',
-    'frontend/src/styles/globals.css'
+    "backend/app/api/endpoints/cache_management.py",
+    "backend/app/api/endpoints/image_file_processing.py",
+    "backend/app/api/endpoints/live_stream_processing.py",
+    "backend/app/api/endpoints/video_file_processing.py",
+    # 'backend/app/main.py',
+    # 'frontend/src/pages/index.js',
+    # 'frontend/src/pages/image-processor.js',
+    # 'frontend/src/pages/video-processor.js',
+    # 'frontend/src/components/Header.js',
+    # 'frontend/src/components/Modal.js',
+    # 'frontend/src/config.js',
+    # 'frontend/src/styles/globals.css'
 ]
 
 MARKDOWN_OUTPUT = []

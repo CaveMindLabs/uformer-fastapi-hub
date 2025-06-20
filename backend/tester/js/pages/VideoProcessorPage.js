@@ -110,6 +110,7 @@ const VideoProcessorPage = {
                 if (!response.ok) throw new Error(`Server returned status ${response.status}`);
                 const data = await response.json();
 
+                // Update status text with progress if available
                 let currentStatus = data.message || `Status: ${data.status}...`;
                 if (data.status === 'processing' && data.progress > 0) {
                     currentStatus = `Processing... ${data.progress}%`;
@@ -123,7 +124,8 @@ const VideoProcessorPage = {
                     startProcessingBtn.disabled = false;
                     startProcessingBtn.textContent = 'Start Processing';
                     statusEl.textContent = 'Processing complete! Ready to download.';
-                    
+
+                    // Correctly set the source and show the elements.
                     processedVideoSrc = `${config.API_BASE_URL}${data.result_path}`;
                     processedVideo.src = processedVideoSrc;
                     processedVideo.classList.remove('hidden');
@@ -158,6 +160,7 @@ const VideoProcessorPage = {
         const handleDownload = async (e) => {
             e.preventDefault();
             if (!processedVideoSrc || isDownloaded) return;
+
             try {
                 const response = await fetch(processedVideoSrc);
                 if (!response.ok) throw new Error(`Failed to fetch. Status: ${response.status}`);
@@ -172,10 +175,12 @@ const VideoProcessorPage = {
                 link.parentNode.removeChild(link);
                 window.URL.revokeObjectURL(url);
                 
-                cleanupPolling();
+                // --- FIX: Add the missing API call and state update ---
+                cleanupPolling(); // Stop the heartbeat poll.
                 const relativePath = new URL(processedVideoSrc).pathname;
                 await fetch(`${config.API_BASE_URL}/api/confirm_download`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ result_path: relativePath })
                 });
 
@@ -185,11 +190,13 @@ const VideoProcessorPage = {
                 downloadBtn.style.backgroundColor = '#2e8b57';
                 downloadBtn.style.color = 'white';
                 statusEl.textContent = "Download initiated successfully.";
+
             } catch (error) {
-                showModal({
-                    title: 'Download Error', status: 'error',
-                    content: `Download failed: ${error.message}. The file may have been cleared from server cache.`,
-                    showCancel: false, confirmText: 'OK'
+                console.error("Download failed:", error);
+                showModal({ 
+                    title: 'Download Error', 
+                    status: 'error',
+                    content: `Download failed: ${error.message}. The file may have been cleared from the server cache.`
                 });
                 statusEl.textContent = `Error: Download failed.`;
             }
