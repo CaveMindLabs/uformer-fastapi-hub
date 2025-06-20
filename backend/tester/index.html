@@ -1,0 +1,26 @@
+<!-- backend/tester/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>NocturaVision - Uformer Test Harness</title>
+    <link rel="stylesheet" href="/tester/css/style.css">
+    <style>
+        /* Small override to ensure main content uses full available height */
+        #app-content {
+            height: 100%;
+            overflow-y: hidden;
+        }
+    </style>
+</head>
+<body>
+    <!-- The Header component will be rendered here by app.js -->
+    <header id="app-header"></header>
+
+    <!-- Page content will be dynamically loaded here by app.js -->
+    <main id="app-content"></main>
+
+    <!-- Main application script, loaded as a module to enable import/export -->
+    <script src="/tester/js/app.js" type="module"></script>
+</body>
+</html>

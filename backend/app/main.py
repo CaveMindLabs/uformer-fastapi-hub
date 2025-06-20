@@ -2,6 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse
 from contextlib import asynccontextmanager
 import os
 import torch
@@ -114,6 +115,12 @@ origins = ["*"] # Allow requests from any origin for development
 # so the frontend can fetch processed images/videos.
 os.makedirs("temp", exist_ok=True)
 app.mount("/static_results", StaticFiles(directory="temp"), name="static_results")
+
+# --- Mount Static Directory for the Test Harness ---
+# This serves the new vanilla JS single-page application from the 'tester' directory.
+# The `html=True` argument enables SPA-style routing.
+os.makedirs("tester", exist_ok=True)
+app.mount("/tester", StaticFiles(directory="tester", html=True), name="tester")
 
 
 app.add_middleware(

@@ -1,0 +1,320 @@
+/* backend/tester/css/style.css */
+/* A direct copy of "frontend/src/styles/globals.css" */
+html, body {
+    height: 100vh;
+    margin: 0;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #282c34;
+    color: white;
+    display: flex;
+    flex-direction: column;
+}
+
+header {
+    background-color: #20232a;
+    padding: 15px 30px;
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.nav-bar {
+    display: flex;
+    gap: 15px;
+}
+
+.nav-button {
+    padding: 8px 15px;
+    border: 1px solid #61dafb;
+    color: #61dafb;
+    background-color: transparent;
+    text-decoration: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.nav-button:hover {
+    background-color: #4a4f5a;
+}
+
+.nav-button.active {
+    background-color: #61dafb;
+    color: #20232a;
+    font-weight: bold;
+}
+
+.title-block {
+    text-align: center;
+}
+
+.title-block h1 {
+    margin: 0 0 5px 0;
+    font-size: 2.2rem;
+}
+
+.title-block p {
+    margin: 0;
+    font-size: 1rem;
+    color: #ccc;
+}
+
+.cache-info-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
+    width: 235px;
+}
+
+.cache-line {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 8px;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.cache-line input[type="checkbox"] {
+    flex-shrink: 0;
+}
+
+.cache-label-text {
+    flex-grow: 1;
+    text-align: left;
+    color: #ccc;
+}
+
+.cache-value {
+    font-weight: bold;
+    min-width: 70px;
+    text-align: right;
+    color: white;
+}
+
+#clearCacheBtn {
+    margin-top: 5px;
+    padding: 6px 12px;
+    font-size: 0.9rem;
+    background-color: #ff6b6b;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+#clearCacheBtn:hover:not(:disabled) {
+    background-color: #e05252;
+}
+
+#clearCacheBtn:disabled {
+    background-color: #555;
+    color: #888;
+    cursor: not-allowed;
+}
+
+.page-content {
+    display: flex;
+    flex-grow: 1;
+    padding: 20px;
+    gap: 20px;
+    box-sizing: border-box;
+    min-height: 0;
+}
+
+.sidebar {
+    flex: 0 0 350px;
+    background-color: #3c4049;
+    padding: 20px;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+    overflow-y: auto;
+}
+
+.sidebar h2 {
+    margin-top: 0;
+    border-bottom: 1px solid #61dafb;
+    padding-bottom: 10px;
+    color: #61dafb;
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.control-group label {
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+.checkbox-group label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+}
+
+.main-content {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-width: 0;
+}
+
+.actions-bar {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background-color: #4a4f5a;
+    padding: 15px;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+#startButton, #stopButton, #startProcessingBtn, #stopProcessingBtn, #processImageBtn {
+    font-size: 1.1rem;
+    padding: 10px 20px;
+    cursor: pointer;
+    border: none;
+    border-radius: 5px;
+    background-color: #61dafb;
+    color: #20232a;
+    font-weight: bold;
+    transition: background-color 0.2s;
+}
+
+#startButton:hover:not(:disabled), #stopButton:hover:not(:disabled), #startProcessingBtn:hover:not(:disabled), #processImageBtn:hover:not(:disabled) {
+    background-color: #52b8d8;
+}
+
+#startButton:disabled, #stopButton:disabled, #startProcessingBtn:disabled, #stopProcessingBtn:disabled, #processImageBtn:disabled {
+    background-color: #555;
+    color: #888;
+    cursor: not-allowed;
+}
+
+#status {
+    font-style: italic;
+    color: #ccc;
+}
+
+#status.error {
+    color: #ff6b6b;
+    font-weight: bold;
+}
+
+.video-feeds-container, .image-feeds-container {
+    display: flex;
+    gap: 20px;
+    flex-grow: 1;
+    min-height: 0;
+}
+
+.video-box, .image-box {
+    flex: 1;
+    background-color: #4a4f5a;
+    border-radius: 8px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    min-width: 0;
+}
+
+.video-header, .image-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.video-header h3, .image-header h3 {
+    margin: 0;
+    color: #61dafb;
+}
+
+.video-header button, .video-header a, .image-header button, .image-header a {
+    font-size: 0.9rem;
+    padding: 8px 12px;
+    border-radius: 5px;
+    border: none;
+    background-color: #61dafb;
+    color: #20232a;
+    font-weight: bold;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.video-player-wrapper, .image-player-wrapper {
+    width: 100%;
+    height: 100%;
+    background-color: #20232a;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.upload-area {
+    border: 2px dashed #ccc;
+    border-radius: 5px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    width: 80%;
+}
+
+.video, .image-display {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border: 1px solid #ccc;
+    background-color: #20232a;
+    box-sizing: border-box;
+}
+
+.video {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 3px;
+}
+
+.image-display {
+    transition: transform 0.1s ease-out;
+    cursor: grab;
+}
+
+.image-display.panning {
+    cursor: grabbing;
+}
+
+.video#webcam {
+    transform: scaleX(-1);
+}
+
+.hidden {
+    display: none;
+}
+
+#taskControlGroup {
+    background-color: #31353c;
+    border: 1px solid #61dafb;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+#taskControlGroup label {
+    color: #61dafb;
+}
