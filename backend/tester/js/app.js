@@ -3,6 +3,7 @@ import { renderHeader } from './components/Header.js';
 import LiveStreamPage from './pages/LiveStreamPage.js';
 import ImageProcessorPage from './pages/ImageProcessorPage.js';
 import VideoProcessorPage from './pages/VideoProcessorPage.js';
+import { createLayout } from './components/Layout.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const headerMount = document.getElementById('app-header');
@@ -30,16 +31,20 @@ document.addEventListener('DOMContentLoaded', () => {
             defaultClearVideos: page.defaultClearVideos,
         });
 
-        // 2. Load the page's HTML into the main content area
-        contentMount.innerHTML = page.getHtml();
+        // 2. Create the layout, passing the page's inner HTML to it
+        const pageLayout = createLayout(page.getHtml());
+        
+        // 3. Load the complete layout into the main content area
+        contentMount.innerHTML = ''; // Clear previous content
+        contentMount.appendChild(pageLayout);
 
-        // 3. Run the page's specific JavaScript initialization logic
+        // 4. Run the page's specific JavaScript initialization logic
         page.init();
     }
 
     // Initial render
-    headerInstance = renderHeader({ onNavClick: navigateTo });
-    headerMount.appendChild(headerInstance.element);
+    // Pass the mount point directly to the renderHeader function
+    headerInstance = renderHeader({ mountPoint: headerMount, onNavClick: navigateTo });
     
     // Load the default page (Live Stream)
     navigateTo('live');

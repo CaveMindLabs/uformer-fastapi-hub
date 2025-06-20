@@ -12,14 +12,14 @@ const ImageProcessorPage = {
             <h2>Image Controls</h2>
             <div class="control-group" id="taskControlGroup">
                 <label for="taskSelect">Task</label>
-                <select id="taskSelect" style="padding: 8px; font-size: 1rem; border-radius: 4px; border: 1px solid #61dafb; background-color: #4a4f5a; color: 'white';">
+                <select id="taskSelect" style="padding: 8px; font-size: 1rem; border-radius: 4px; border: 1px solid #61dafb; background-color: #4a4f5a; color: white;">
                     <option value="denoise">Denoise</option>
                     <option value="deblur">Deblur</option>
                 </select>
             </div>
             <div class="control-group">
                 <label for="modelSelect">Enhancement Model</label>
-                <select id="modelSelect" style="padding: 8px; font-size: 1rem; border-radius: 4px; border: 1px solid #61dafb; background-color: #4a4f5a; color: 'white';"></select>
+                <select id="modelSelect" style="padding: 8px; font-size: 1rem; border-radius: 4px; border: 1px solid #61dafb; background-color: #4a4f5a; color: white;"></select>
             </div>
             <div class="control-group checkbox-group">
                 <label>

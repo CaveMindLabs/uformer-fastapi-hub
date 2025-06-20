@@ -26,7 +26,7 @@ const LiveStreamPage = {
             <div class="control-group checkbox-group">
                 <label>
                     <input type="checkbox" id="patchCheckbox" /> Use Patch Processing
-                    <span id="patchWarning" style="color: '#ff6b6b'; font-weight: bold; display: none;"> (Not Recommended: Very Slow)</span>
+                    <span id="patchWarning" style="color: #ff6b6b; font-weight: bold; display: none;"> (Not Recommended: Very Slow)</span>
                 </label>
             </div>
         </div>
@@ -39,7 +39,7 @@ const LiveStreamPage = {
             <div class="video-feeds-container">
                 <div class="video-box">
                      <div class="video-header" style="justify-content: center;"><h3>Original Webcam</h3></div>
-                    <video id="webcam" class="video" autoPlay playsInline muted style="transform: scaleX(-1);"></video>
+                    <video id="webcam" class="video" autoPlay playsInline muted></video>
                 </div>
                 <div class="video-box">
                     <div class="video-header" style="justify-content: center;">

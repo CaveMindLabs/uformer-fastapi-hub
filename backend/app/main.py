@@ -150,6 +150,8 @@ async def health_check():
 @app.get("/")
 async def read_root():
     return {"message": "Welcome to NocturaVision Uformer API! Visit /docs for API documentation."}
+    # """Redirects to the main test harness UI."""
+    # return RedirectResponse(url="/tester/index.html")
 
 # To run this application:
 # 1. Navigate to the 'backend/' directory in your terminal (inside pipenv shell)
