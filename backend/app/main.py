@@ -100,9 +100,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="NocturaVision Uformer API",
-    description="Backend API for real-time low-light image enhancement using Uformer.",
-    version="0.1.0",
+    title="Uformer FastAPI Hub",
+    description="A FastAPI backend for high-performance image and video enhancement using the Uformer model.",
+    version="1.0.0",
     lifespan=lifespan # Attach the lifespan context manager
 )
 

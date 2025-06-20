@@ -16,7 +16,7 @@ NavBar.displayName = 'NavBar';
 
 const TitleBlock = React.memo(({ pageTitle }) => (
     <div className="title-block">
-        <h1>🦉 NocturaVision <span style={{ fontWeight: 300, color: '#ccc' }}>| Uformer</span></h1>
+        <h1>🦉 Enhancement Hub <span style={{ fontWeight: 300, color: '#ccc' }}>| Uformer</span></h1>
         <p>{pageTitle}</p>
     </div>
 ));
