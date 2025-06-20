@@ -94,8 +94,15 @@ const CacheManager = React.forwardRef(({ defaultClearImages, defaultClearVideos 
                         const plural = skipped_count === 1 ? 'file' : 'files';
                         const verbPhrase = skipped_count === 1 ? 'that is' : 'that are';
                         messages.push(`Skipped ${skipped_count} protected ${plural} ${verbPhrase} awaiting download.`);
+                        
                         modalStatus = cleared_count > 0 ? 'warning' : 'error';
-                        modalTitle = cleared_count > 0 ? 'Cache Partially Cleared' : 'Cache Files in Use';
+
+                        if (cleared_count > 0) {
+                            modalTitle = 'Cache Partially Cleared';
+                        } else {
+                            // Set title dynamically based on number of skipped files.
+                            modalTitle = skipped_count === 1 ? 'Cache File in Use' : 'Cache Files in Use';
+                        }
                     }
 
                     if (cleared_count === 0 && skipped_count === 0) {
