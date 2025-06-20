@@ -1,5 +1,5 @@
 # backend/app/main.py
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
@@ -7,7 +7,6 @@ import os
 import torch
 from dotenv import load_dotenv
 import asyncio
-import time
 
 # Import the endpoint router to call its function directly
 from app.api.endpoints import cache_management
