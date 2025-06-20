@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef, useImperativeHandle } from 'react';
 import Link from 'next/link';
 import Modal from './Modal'; // Import the new Modal component
+import config from '../config'; // Import the centralized config
 
 // Memoized static components to prevent re-rendering when the parent state changes.
 const NavBar = React.memo(({ activePage }) => (
@@ -354,7 +355,7 @@ const Header = ({ activePage, pageTitle, defaultClearImages, defaultClearVideos 
         window.addEventListener('forceHeaderUpdate', updateAllStatus);
 
         // Set up the polling for consistent background/cross-tab updates.
-        const pollInterval = setInterval(updateAllStatus, 2000);
+        const pollInterval = setInterval(updateAllStatus, config.HEADER_STATUS_POLL_INTERVAL_MS);
 
         updateAllStatus(); // Initial update on mount
 

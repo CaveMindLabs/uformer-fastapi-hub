@@ -1,11 +1,16 @@
-# noctura-uformer/backend/app/main.py
-from fastapi import FastAPI
+# uformer-fastapi-hub/backend/app/main.py
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import os
 import torch
 from dotenv import load_dotenv
+import asyncio
+import time
+
+# Import the endpoint router to call its function directly
+from app.api.endpoints import cache_management
 
 # Import the model loading dependency AND the app_models dictionary
 from app.api.dependencies import load_models, app_models, unload_all_models_from_memory 
@@ -16,6 +21,23 @@ load_dotenv()
 
 
 # Using asynccontextmanager to manage application startup/shutdown events
+async def periodic_cache_cleanup_task():
+    """A periodic task to automatically clean up unprotected cache files."""
+    interval_minutes = float(os.getenv("AUTOMATIC_CLEANUP_INTERVAL_MINUTES", 30))
+    print(f"[AUTO_CLEANUP] Task started. Will run every {interval_minutes} minutes.")
+    
+    while True:
+        await asyncio.sleep(interval_minutes * 60)
+        print("[AUTO_CLEANUP] Running scheduled cache cleanup...")
+        try:
+            # We can reuse the same logic from the manual endpoint.
+            # We don't need the response here, just the action.
+            await cache_management.clear_cache(clear_images=True, clear_videos=True)
+            print("[AUTO_CLEANUP] Scheduled cleanup finished.")
+        except Exception as e:
+            print(f"[AUTO_CLEANUP] Error during scheduled cleanup: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -31,8 +53,8 @@ async def lifespan(app: FastAPI):
     app_models["device"] = device # Store device in shared state
     app_models["tasks_db"] = {} # Initialize shared dictionary for background task status
     app_models["models_in_use"] = {} # Initialize reference counter for models in use
-    app_models["active_result_paths"] = {} # Tracks paths awaiting download confirmation
-    app_models["downloaded_result_paths"] = {} # Tracks paths with download timestamp
+    app_models["tracker_by_path"] = {} # Main tracker for result file metadata
+    app_models["path_by_task_id"] = {} # Secondary index for task_id -> path lookups
 
     # Determine model loading strategy from environment variable
     load_all_on_startup = os.getenv("LOAD_ALL_MODELS_ON_STARTUP", "True").lower() == "true"
@@ -54,10 +76,21 @@ async def lifespan(app: FastAPI):
         # Pre-populate model definitions so they are ready for on-demand loading
         # This will save a bit of overhead compared to defining them every time.
         await load_models(device, app_models=app_models, load_definitions_only=True)
-        print(f"Model definitions loaded successfully. Ready for on-demand loading: {list(k for k in app_models.keys() if k not in ['device', 'load_all_on_startup', 'tasks_db'])}")
+        print(f"Model definitions loaded successfully. Ready for on-demand loading: {list(k for k in app_models.keys() if k not in ['device', 'load_all_on_startup', 'tasks_db', 'models_in_use', 'tracker_by_path', 'path_by_task_id'])}")
 
+    # --- Schedule the automatic cleanup task if enabled ---
+    if os.getenv("ENABLE_AUTOMATIC_CACHE_CLEANUP", "False").lower() == "true":
+        cleanup_task = asyncio.create_task(periodic_cache_cleanup_task())
+    else:
+        cleanup_task = None
+        print("[AUTO_CLEANUP] Automatic cache cleanup is disabled.")
 
     yield # Application is running
+
+    # --- Cancel the cleanup task on shutdown ---
+    if cleanup_task:
+        cleanup_task.cancel()
+        print("[AUTO_CLEANUP] Automatic cache cleanup task stopped.")
 
     print("FastAPI application shutdown...")
     if app_models:

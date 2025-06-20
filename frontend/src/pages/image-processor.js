@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Layout from '../components/Layout'; // Import the Layout component
 import Modal from '../components/Modal'; // Import the Modal component
+import config from '../config'; // Import the centralized config
 
 const ImageProcessorPage = () => {
     // --- Refs for DOM Elements & Non-State Data ---
@@ -13,7 +14,8 @@ const ImageProcessorPage = () => {
     const modelSelectRef = useRef(null);
     const patchCheckboxRef = useRef(null);
     const selectedImageFile = useRef(null); // The raw file object
-    const pollIntervalRef = useRef(null); // To store the polling interval ID
+    const pollIntervalRef = useRef(null); // To store the progress polling interval ID
+    const heartbeatIntervalRef = useRef(null); // To store the heartbeat polling interval ID
 
     // --- React State for UI Control ---
     const [statusText, setStatusText] = useState("Please select an image file. Supports: jpeg, png, gif, webp, .arw, .nef, .cr2, .dng.");
@@ -29,6 +31,10 @@ const ImageProcessorPage = () => {
         if (pollIntervalRef.current) {
             clearInterval(pollIntervalRef.current);
             pollIntervalRef.current = null;
+        }
+        if (heartbeatIntervalRef.current) {
+            clearInterval(heartbeatIntervalRef.current);
+            heartbeatIntervalRef.current = null;
         }
     };
 
@@ -55,11 +61,36 @@ const ImageProcessorPage = () => {
 
             switch (data.status) {
                 case 'completed':
-                    cleanupPolling();
+                    // Stop the progress polling, but start the heartbeat polling.
+                    if (pollIntervalRef.current) {
+                        clearInterval(pollIntervalRef.current);
+                        pollIntervalRef.current = null;
+                    }
+                    
                     setIsProcessing(false);
-                    setStatusText('Processing complete!');
-                    // Prepend the backend server URL to the relative path
-                    setProcessedImageSrc(`http://127.0.0.1:8000${data.result_path}`);
+                    setStatusText('Processing complete! Ready to download.');
+                    setProcessedImageSrc(`${config.API_BASE_URL}${data.result_path}`);
+
+                    // --- Start Heartbeat ---
+                    const sendHeartbeat = async (taskIdForHeartbeat) => {
+                        try {
+                            // console.log(`Sending heartbeat for task: ${taskIdForHeartbeat}`);
+                            await fetch(`${config.API_BASE_URL}/api/task_heartbeat`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ task_id: taskIdForHeartbeat })
+                            });
+                        } catch (err) {
+                            console.error("Heartbeat failed:", err);
+                            // If heartbeat fails, stop polling to prevent spamming a dead server.
+                            cleanupPolling();
+                        }
+                    };
+                    
+                    // Send first heartbeat immediately, then start interval
+                    sendHeartbeat(currentTaskId);
+                    heartbeatIntervalRef.current = setInterval(() => sendHeartbeat(currentTaskId), config.HEARTBEAT_POLL_INTERVAL_MS);
+                    // ---------------------
                     break;
                 case 'failed':
                     cleanupPolling();
@@ -113,8 +144,9 @@ const ImageProcessorPage = () => {
             
             // --- Confirm Download with Backend and Update UI ---
             try {
+                cleanupPolling(); // Stop the heartbeat poll since we are downloading.
                 const relativePath = new URL(processedImageSrc).pathname;
-                await fetch('http://127.0.0.1:8000/api/confirm_download', {
+                await fetch(`${config.API_BASE_URL}/api/confirm_download`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ result_path: relativePath })
@@ -190,7 +222,7 @@ const ImageProcessorPage = () => {
 
             // Start polling
             cleanupPolling(); // Ensure no old pollers are running
-            pollIntervalRef.current = setInterval(() => pollTaskStatus(newTaskId), 2000);
+            pollIntervalRef.current = setInterval(() => pollTaskStatus(newTaskId), config.IMAGE_STATUS_POLL_INTERVAL_MS);
 
         } catch (error) {
             setIsProcessing(false);

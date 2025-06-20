@@ -68,7 +68,7 @@ OR
 pipenv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --no-access-log
 
 # Run the Test Client:
-    # Navigate to the noctura-uformer/backend/ directory in your file explorer.
+    # Navigate to the uformer-fastapi-hub/backend/ directory in your file explorer.
 
     # Double-click the wstest_uformer.html file to open it in your web browser.
 

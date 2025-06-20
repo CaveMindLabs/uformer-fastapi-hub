@@ -1,13 +1,17 @@
-# noctura-uformer/backend/app/api/endpoints/cache_management.py
+# uformer-fastapi-hub/backend/app/api/endpoints/cache_management.py
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List
 import os
 import shutil
 import traceback
 import torch
 import time
+from dotenv import load_dotenv
+
+# Load environment variables to get grace periods
+load_dotenv()
 
 from app.api.dependencies import app_models, unload_all_models_from_memory # Import app_models and the new utility
 from app.api.dependencies import model_definitions_dict # Import this here
@@ -17,6 +21,9 @@ class UnloadModelsRequest(BaseModel):
 
 class ConfirmDownloadRequest(BaseModel):
     result_path: str
+
+class TaskHeartbeatRequest(BaseModel):
+    task_id: str
 
 router = APIRouter()
 
@@ -76,47 +83,80 @@ async def get_cache_status():
 @router.post("/api/clear_cache", tags=["cache_management"])
 async def clear_cache(clear_images: bool = True, clear_videos: bool = True):
     """
-    Clears content from temp directories, respecting files that are awaiting download
-    or are within their download grace period.
+    Clears content from temp directories, respecting files that are protected
+    (awaiting download or within their download grace period).
     """
     if not clear_images and not clear_videos:
         return JSONResponse(status_code=400, content={"message": "No action taken."})
 
-    # Get all paths that should NOT be deleted
-    active_paths = app_models.get("active_result_paths", {})
-    downloaded_paths = app_models.get("downloaded_result_paths", {})
-    protected_paths = set(active_paths.keys()) | set(downloaded_paths.keys())
-    
+    tracker_by_path = app_models.get("tracker_by_path", {})
+    path_by_task_id = app_models.get("path_by_task_id", {})
+    cleared_count = 0
     skipped_count = 0
 
-    def safe_clear_dir(path_to_clear):
-        nonlocal skipped_count
-        if not os.path.exists(path_to_clear):
-            return
+    # Load grace periods from environment variables with sane defaults
+    try:
+        image_grace_period = float(os.getenv("IMAGE_DOWNLOAD_GRACE_PERIOD_MINUTES", 60)) * 60
+        video_grace_period = float(os.getenv("VIDEO_DOWNLOAD_GRACE_PERIOD_MINUTES", 180)) * 60
+        heartbeat_timeout = float(os.getenv("HEARTBEAT_TIMEOUT_MINUTES", 10)) * 60
+    except ValueError:
+        raise HTTPException(status_code=500, detail="Invalid timer value in .env file.")
+
+    def is_unprotected(path: str) -> bool:
+        """Determines if a file is eligible for deletion based on tracking info."""
+        file_info = tracker_by_path.get(path)
+        if not file_info:
+            # If a file exists on disk but is not in our tracker, it's unprotected.
+            return True
         
-        for dirpath, dirnames, filenames in os.walk(path_to_clear):
+        current_time = time.time()
+        
+        # Condition A: Downloaded and expired
+        if file_info["status"] == "downloaded" and file_info["downloaded_at"] is not None:
+            grace_period = video_grace_period if path.endswith(('.mp4', '.mov', '.avi')) else image_grace_period
+            if (current_time - file_info["downloaded_at"]) > grace_period:
+                return True
+
+        # Condition B: Active but abandoned (heartbeat timed out)
+        elif file_info["status"] == "active":
+            if (current_time - file_info["last_heartbeat_at"]) > heartbeat_timeout:
+                return True
+        
+        # If none of the above, the file is protected
+        return False
+
+    def safe_clear_dir(path_to_clear):
+        nonlocal cleared_count, skipped_count
+        if not os.path.exists(path_to_clear): return
+
+        # Walk the directory from the bottom up to allow subdirectory removal
+        for dirpath, dirnames, filenames in os.walk(path_to_clear, topdown=False):
+            # First, process files
             for f in filenames:
-                file_path = os.path.join(dirpath, f)
-                # Convert absolute disk path to the server-relative path used in tracking
-                relative_path = f"/static_results/{os.path.relpath(file_path, 'temp').replace(os.path.sep, '/')}"
+                file_path_abs = os.path.join(dirpath, f)
+                file_path_rel = f"/static_results/{os.path.relpath(file_path_abs, 'temp').replace(os.path.sep, '/')}"
                 
-                if relative_path in protected_paths:
-                    print(f"[CACHE_CLEAR] SKIPPING: {relative_path} is protected.")
-                    skipped_count += 1
-                else:
+                if is_unprotected(file_path_rel):
                     try:
-                        os.unlink(file_path)
+                        os.unlink(file_path_abs)
+                        cleared_count += 1
+                        # Clean up tracker if we delete the file
+                        if file_path_rel in tracker_by_path:
+                            task_id_to_del = tracker_by_path[file_path_rel].get("task_id")
+                            del tracker_by_path[file_path_rel]
+                            if task_id_to_del and task_id_to_del in path_by_task_id:
+                                del path_by_task_id[task_id_to_del]
                     except Exception as e:
-                        print(f"Failed to delete file {file_path}. Reason: {e}")
+                        print(f"Failed to delete file {file_path_abs}. Reason: {e}")
+                else:
+                    skipped_count += 1
             
-            # This part is for cleaning up empty subdirectories after files are deleted
+            # Then, try to remove now-empty subdirectories
             for d in dirnames:
-                dir_to_check = os.path.join(dirpath, d)
                 try:
-                    if not os.listdir(dir_to_check):
-                        os.rmdir(dir_to_check)
+                    os.rmdir(os.path.join(dirpath, d))
                 except OSError:
-                    pass # Directory is not empty, which is fine
+                    pass # Dir not empty, which is fine
 
     try:
         if clear_images:
@@ -124,12 +164,10 @@ async def clear_cache(clear_images: bool = True, clear_videos: bool = True):
         if clear_videos:
             safe_clear_dir(TEMP_DIRS["videos"])
         
-        message = "Cache clearing complete."
-        if skipped_count > 0:
-            plural = "file" if skipped_count == 1 else "files"
-            message += f" Skipped {skipped_count} {plural} awaiting download."
-
-        return JSONResponse(status_code=200, content={"message": message})
+        return JSONResponse(status_code=200, content={
+            "cleared_count": cleared_count,
+            "skipped_count": skipped_count
+        })
     except Exception as e:
         print(f"Error clearing cache: {e}")
         traceback.print_exc()
@@ -138,27 +176,46 @@ async def clear_cache(clear_images: bool = True, clear_videos: bool = True):
 @router.post("/api/confirm_download", tags=["cache_management"])
 async def confirm_download(request: ConfirmDownloadRequest):
     """
-    Confirms that a download for a result file has been initiated by the user.
-    This moves the file path from the 'active' tracker to the 'downloaded' tracker
-    with a timestamp, starting the countdown for its eventual cleanup.
+    Confirms that a download for a result file has been initiated.
+    This updates the file's status to 'downloaded' and sets the download timestamp.
     """
     result_path = request.result_path
-    active_paths = app_models.get("active_result_paths", {})
-    downloaded_paths = app_models.get("downloaded_result_paths", {})
+    tracker_by_path = app_models.get("tracker_by_path", {})
     
-    if result_path in active_paths:
-        # Move from active to downloaded with a timestamp
-        del active_paths[result_path]
-        downloaded_paths[result_path] = time.time()
-        print(f"[CACHE_TRACKER] Confirmed download for '{result_path}'. Moved to timed cleanup queue.")
-        return JSONResponse(status_code=200, content={"message": "Download confirmed and queued for cleanup."})
-    elif result_path in downloaded_paths:
-        # This can happen if user clicks download multiple times
-        return JSONResponse(status_code=200, content={"message": "Download was already confirmed."})
-    else:
-        # This case should be rare but is good for robustness
-        print(f"[CACHE_TRACKER] WARNING: Received download confirmation for untracked path '{result_path}'.")
-        return JSONResponse(status_code=404, content={"message": "Result path not found in active tracker."})
+    if result_path in tracker_by_path:
+        file_info = tracker_by_path[result_path]
+        if file_info["status"] == "active":
+            file_info["status"] = "downloaded"
+            file_info["downloaded_at"] = time.time()
+            print(f"[CACHE_TRACKER] Confirmed download for '{result_path}'. Status set to 'downloaded'.")
+            return JSONResponse(status_code=200, content={"message": "Download confirmed."})
+        elif file_info["status"] == "downloaded":
+            return JSONResponse(status_code=200, content={"message": "Download was already confirmed."})
+
+    print(f"[CACHE_TRACKER] WARNING: Received download confirmation for untracked path '{result_path}'.")
+    return JSONResponse(status_code=404, content={"message": "Result path not found in tracker."})
+
+@router.post("/api/task_heartbeat", tags=["cache_management"])
+async def task_heartbeat(request: TaskHeartbeatRequest):
+    """
+    Receives a heartbeat from a client actively viewing a task result.
+    This updates the 'last_heartbeat_at' timestamp for the result file,
+    preventing it from being prematurely cleaned up as an 'orphaned' file.
+    """
+    path_by_task_id = app_models.get("path_by_task_id", {})
+    tracker_by_path = app_models.get("tracker_by_path", {})
+    
+    result_path = path_by_task_id.get(request.task_id)
+    
+    if result_path and result_path in tracker_by_path:
+        tracker_by_path[result_path]["last_heartbeat_at"] = time.time()
+        # print(f"[HEARTBEAT] Received for task {request.task_id}. Updated timestamp for {result_path}.")
+        return {"status": "heartbeat_received"}
+    
+    # It's okay if the path is not found; the client might have downloaded/cleared it.
+    # We don't need to return an error, just acknowledge the request.
+    return {"status": "task_not_found_ok"}
+
 
 @router.post("/api/unload_models", tags=["cache_management"])
 async def unload_models_endpoint(request: UnloadModelsRequest):

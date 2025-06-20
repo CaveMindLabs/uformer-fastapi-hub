@@ -1,6 +1,7 @@
 // frontend/src/pages/index.js
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Layout from '../components/Layout'; // Import the new Layout component
+import config from '../config'; // Import the centralized config
 
 const LiveStreamPage = () => {
     // --- Refs for direct DOM access ---
@@ -21,7 +22,8 @@ const LiveStreamPage = () => {
         let websocket;
         let stream;
         let localIsStreaming = false;
-        const WS_URL = "ws://127.0.0.1:8000/ws/process_video";
+        // Use the WEBSOCKET_URL from the centralized config file
+        const WS_URL = config.WEBSOCKET_URL;
 
         const webcamVideo = webcamVideoRef.current;
         const processedImage = processedImageRef.current;

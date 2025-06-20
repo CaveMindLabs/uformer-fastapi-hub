@@ -1,4 +1,4 @@
-# noctura-uformer/backend/app/api/dependencies.py
+# uformer-fastapi-hub/backend/app/api/dependencies.py
 from fastapi import Depends, HTTPException
 import traceback
 import torch

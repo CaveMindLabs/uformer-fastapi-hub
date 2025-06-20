@@ -1,4 +1,4 @@
-# noctura-uformer/backend/app/api/endpoints/image_file_processing.py
+# uformer-fastapi-hub/backend/app/api/endpoints/image_file_processing.py
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, BackgroundTasks
 from fastapi.responses import Response, JSONResponse
 from PIL import Image
@@ -146,10 +146,27 @@ def run_image_enhancement_task(
         relative_path = os.path.relpath(processed_filepath, "temp").replace("\\", "/")
         full_result_path = f"/static_results/{relative_path}"
         print(f"[BG-TASK:{task_id}] Completed. Result at: {full_result_path}")
+
+        # --- Add new result file to the trackers ---
+        tracker_by_path = models.get("tracker_by_path", {})
+        path_by_task_id = models.get("path_by_task_id", {})
         
-        # Add the result to the active tracker, awaiting download confirmation
-        active_paths_tracker = models["active_result_paths"]
-        active_paths_tracker[full_result_path] = True
+        current_timestamp = time.time()
+        
+        # Main tracker entry
+        tracker_by_path[full_result_path] = {
+            "status": "active",
+            "task_id": task_id,
+            "created_at": current_timestamp,
+            "downloaded_at": None,
+            "last_heartbeat_at": current_timestamp  # Initialize with created_at
+        }
+        
+        # Secondary index entry
+        path_by_task_id[task_id] = full_result_path
+        
+        print(f"[CACHE_TRACKER] Added '{full_result_path}' to tracker for task '{task_id}'.")
+        # ---------------------------------------------
 
         tasks_db[task_id] = {"status": "completed", "result_path": full_result_path}
 
