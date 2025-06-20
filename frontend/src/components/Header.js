@@ -92,7 +92,8 @@ const CacheManager = React.forwardRef(({ defaultClearImages, defaultClearVideos 
 
                     if (skipped_count > 0) {
                         const plural = skipped_count === 1 ? 'file' : 'files';
-                        messages.push(`Skipped ${skipped_count} protected ${plural} that are awaiting download.`);
+                        const verbPhrase = skipped_count === 1 ? 'that is' : 'that are';
+                        messages.push(`Skipped ${skipped_count} protected ${plural} ${verbPhrase} awaiting download.`);
                         modalStatus = cleared_count > 0 ? 'warning' : 'error';
                         modalTitle = cleared_count > 0 ? 'Cache Partially Cleared' : 'Cache Files in Use';
                     }
