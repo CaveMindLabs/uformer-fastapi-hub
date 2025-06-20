@@ -131,7 +131,9 @@ def video_processing_task(task_id: str, input_path: str, output_path: str, model
         # --- File Cache Tracking ---
         tracker_by_path = models_container.get("tracker_by_path", {})
         path_by_task_id = models_container.get("path_by_task_id", {})
+
         current_timestamp = time.time()
+        
         tracker_by_path[full_result_path] = {
             "status": "active",
             "task_id": task_id,
@@ -158,6 +160,14 @@ def video_processing_task(task_id: str, input_path: str, output_path: str, model
             models_in_use[model_name] = max(0, models_in_use.get(model_name, 0) - 1)
             print(f"[REF_COUNT] DECREMENT: Model '{model_name}' in use count is now {models_in_use[model_name]}.")
         # ----------------------------------------
+        
+        # --- Unprotect the in-progress upload ---
+        in_progress_uploads = models_container.get("in_progress_uploads", {})
+        abs_input_path = os.path.abspath(input_path)
+        if abs_input_path in in_progress_uploads:
+            del in_progress_uploads[abs_input_path]
+            print(f"[UPLOAD_TRACKER] Unprotected upload (task finished): {input_path}")
+        # --------------------------------------
 
 
 @router.post("/api/process_video")
@@ -192,6 +202,13 @@ async def process_video(
     # Save the uploaded file
     with open(input_path, "wb") as buffer:
         buffer.write(await video_file.read())
+
+    # --- Protect the in-progress upload ---
+    in_progress_uploads = models_container.get("in_progress_uploads", {})
+    # Store the absolute path for reliable checking
+    in_progress_uploads[os.path.abspath(input_path)] = True
+    print(f"[UPLOAD_TRACKER] Protecting in-progress upload: {input_path}")
+    # ------------------------------------
 
     # Initial entry in the central tasks_db
     tasks_db[task_id] = {"status": "pending", "filename": sanitized_filename, "message": "Task queued."}

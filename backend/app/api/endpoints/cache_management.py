@@ -84,13 +84,14 @@ async def get_cache_status():
 async def clear_cache(clear_images: bool = True, clear_videos: bool = True):
     """
     Clears content from temp directories, respecting files that are protected
-    (awaiting download or within their download grace period).
+    (awaiting download, within their download grace period, or currently being processed).
     """
     if not clear_images and not clear_videos:
         return JSONResponse(status_code=400, content={"message": "No action taken."})
 
     tracker_by_path = app_models.get("tracker_by_path", {})
     path_by_task_id = app_models.get("path_by_task_id", {})
+    in_progress_uploads = app_models.get("in_progress_uploads", {}) # Get the new tracker
     cleared_count = 0
     skipped_count = 0
 
@@ -102,11 +103,15 @@ async def clear_cache(clear_images: bool = True, clear_videos: bool = True):
     except ValueError:
         raise HTTPException(status_code=500, detail="Invalid timer value in .env file.")
 
-    def is_unprotected(path: str) -> bool:
+    def is_unprotected(abs_path: str, rel_path: str) -> bool:
         """Determines if a file is eligible for deletion based on tracking info."""
-        file_info = tracker_by_path.get(path)
+        # First, check if it's an in-progress upload using its absolute path.
+        if abs_path in in_progress_uploads:
+            return False # PROTECTED
+
+        file_info = tracker_by_path.get(rel_path)
         if not file_info:
-            # If a file exists on disk but is not in our tracker, it's unprotected.
+            # If it's not an active upload and not a tracked result, it's unprotected.
             return True
         
         current_time = time.time()
@@ -137,7 +142,7 @@ async def clear_cache(clear_images: bool = True, clear_videos: bool = True):
                 file_path_abs = os.path.join(dirpath, f)
                 file_path_rel = f"/static_results/{os.path.relpath(file_path_abs, 'temp').replace(os.path.sep, '/')}"
                 
-                if is_unprotected(file_path_rel):
+                if is_unprotected(file_path_abs, file_path_rel):
                     try:
                         os.unlink(file_path_abs)
                         cleared_count += 1

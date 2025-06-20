@@ -233,8 +233,15 @@ const VideoProcessorPage = () => {
         taskSelect.addEventListener('change', () => populateModelSelect(taskSelect.value));
         populateModelSelect(taskSelect.value);
 
+        // This effect will run ONLY when originalVideoSrc changes.
+        // It directly manipulates the video element's src, which is a stable way
+        // to handle media elements in React and avoid the AbortError.
+        if (originalVideoRef.current) {
+            originalVideoRef.current.src = originalVideoSrc;
+        }
+
         return () => cleanupPolling();
-    }, [handleVideoFileSelect]);
+    }, [handleVideoFileSelect, originalVideoSrc]); // Add originalVideoSrc as a dependency
     
     const headerProps = {
         activePage: "video",
@@ -287,7 +294,8 @@ const VideoProcessorPage = () => {
                                 <p>Drag & Drop a video file here or click this area</p>
                                 <p style={{ fontSize: '0.8rem', color: '#ccc' }}>(Supports: MP4, MOV, etc.)</p>
                             </div>
-                            <video id="originalVideo" ref={originalVideoRef} controls className={`video ${!originalVideoSrc ? 'hidden' : ''}`}></video>
+                            {/* We remove the src attribute from here to control it directly via useEffect */}
+                            <video id="originalVideo" ref={originalVideoRef} controls className={`image-display ${!originalVideoSrc ? 'hidden' : ''}`}></video>
                         </div>
                     </div>
                     <div className="video-box">
@@ -298,7 +306,7 @@ const VideoProcessorPage = () => {
                             </button>
                         </div>
                         <div className="video-player-wrapper">
-                            <video id="processedVideo" src={processedVideoSrc} controls className={`video ${!processedVideoSrc ? 'hidden' : ''}`}></video>
+                            <video id="processedVideo" src={processedVideoSrc} controls className={`image-display ${!processedVideoSrc ? 'hidden' : ''}`}></video>
                         </div>
                     </div>
                 </div>

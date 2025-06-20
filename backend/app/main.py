@@ -54,6 +54,7 @@ async def lifespan(app: FastAPI):
     app_models["models_in_use"] = {} # Initialize reference counter for models in use
     app_models["tracker_by_path"] = {} # Main tracker for result file metadata
     app_models["path_by_task_id"] = {} # Secondary index for task_id -> path lookups
+    app_models["in_progress_uploads"] = {} # Tracks raw uploads being used by active tasks
 
     # Determine model loading strategy from environment variable
     load_all_on_startup = os.getenv("LOAD_ALL_MODELS_ON_STARTUP", "True").lower() == "true"
