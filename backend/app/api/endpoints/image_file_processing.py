@@ -140,6 +140,12 @@ def run_image_enhancement_task(
         processed_filename_base = os.path.splitext(original_filename)[0]
         processed_filename = f"{unique_id}_processed_{processed_filename_base}.jpg"
         processed_filepath = os.path.join(image_processed_dir, processed_filename)
+
+        # --- FIX: Ensure the destination directory exists right before writing ---
+        # This prevents the race condition where clear_cache could have deleted it.
+        os.makedirs(os.path.dirname(processed_filepath), exist_ok=True)
+        # --- END FIX ---
+        
         with open(processed_filepath, "wb") as f:
             f.write(img_byte_arr.getvalue())
         
