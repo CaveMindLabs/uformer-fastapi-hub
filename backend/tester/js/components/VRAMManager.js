@@ -69,10 +69,18 @@ export function createVRAMManager() {
     };
     
     const handleClearModels = (modelsToClear = []) => {
-        let confirmMsg = modelsToClear.length === 0 
-            ? "Unload all available models from VRAM?" 
-            : `Unload the selected ${modelsToClear.length} model(s)?`;
+        const isClearingAll = modelsToClear.length === 0;
+        const modelListStr = Array.from(modelsToClear).join(', ');
 
+        let confirmMsg;
+        if (isClearingAll) {
+            confirmMsg = "Are you sure you want to unload all available models from VRAM? This may cause a delay on subsequent requests.";
+        } else if (modelsToClear.length === 1) {
+            confirmMsg = `Are you sure you want to unload the selected model (${modelListStr}) from VRAM?`;
+        } else {
+            confirmMsg = `Are you sure you want to unload the selected models (${modelListStr}) from VRAM?`;
+        }
+        
         showModal({
             title: 'Confirm VRAM Clearing',
             content: confirmMsg,
