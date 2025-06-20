@@ -80,7 +80,9 @@ const CacheManager = React.forwardRef(({ defaultClearImages, defaultClearVideos 
                     const result = await response.json();
                     if (!response.ok) throw new Error(result.detail || 'Failed to clear cache.');
 
-                    const { cleared_count, skipped_count } = result;
+                    const { cleared_count, skipped_in_progress_count, skipped_awaiting_download_count } = result;
+                    const total_skipped = skipped_in_progress_count + skipped_awaiting_download_count;
+
                     let modalTitle = 'Success';
                     let modalStatus = 'success';
                     let messages = [];
@@ -90,22 +92,26 @@ const CacheManager = React.forwardRef(({ defaultClearImages, defaultClearVideos 
                         messages.push(`Successfully cleared ${cleared_count} ${plural} from the cache.`);
                     }
 
-                    if (skipped_count > 0) {
-                        const plural = skipped_count === 1 ? 'file' : 'files';
-                        const verbPhrase = skipped_count === 1 ? 'that is' : 'that are';
-                        messages.push(`Skipped ${skipped_count} protected ${plural} ${verbPhrase} awaiting download.`);
-                        
-                        modalStatus = cleared_count > 0 ? 'warning' : 'error';
+                    if (skipped_in_progress_count > 0) {
+                        const plural = skipped_in_progress_count === 1 ? 'file' : 'files';
+                        const verb = skipped_in_progress_count === 1 ? 'it is' : 'they are';
+                        messages.push(`Skipped ${skipped_in_progress_count} ${plural} as ${verb} currently being processed.`);
+                    }
 
+                    if (skipped_awaiting_download_count > 0) {
+                        const plural = skipped_awaiting_download_count === 1 ? 'file' : 'files';
+                        const verb = skipped_awaiting_download_count === 1 ? 'is' : 'are';
+                        messages.push(`Skipped ${skipped_awaiting_download_count} ${plural} that ${verb} awaiting download.`);
+                    }
+
+                    if (total_skipped > 0) {
+                        modalStatus = cleared_count > 0 ? 'warning' : 'error';
                         if (cleared_count > 0) {
                             modalTitle = 'Cache Partially Cleared';
                         } else {
-                            // Set title dynamically based on number of skipped files.
-                            modalTitle = skipped_count === 1 ? 'Cache File in Use' : 'Cache Files in Use';
+                            modalTitle = total_skipped === 1 ? 'Cache File in Use' : 'Cache Files in Use';
                         }
-                    }
-
-                    if (cleared_count === 0 && skipped_count === 0) {
+                    } else if (cleared_count === 0) {
                          messages.push('No files were eligible for clearing.');
                          modalTitle = 'Info';
                     }

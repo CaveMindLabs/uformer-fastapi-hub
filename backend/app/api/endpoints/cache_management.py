@@ -91,9 +91,12 @@ async def clear_cache(clear_images: bool = True, clear_videos: bool = True):
 
     tracker_by_path = app_models.get("tracker_by_path", {})
     path_by_task_id = app_models.get("path_by_task_id", {})
-    in_progress_uploads = app_models.get("in_progress_uploads", {}) # Get the new tracker
+    in_progress_uploads = app_models.get("in_progress_uploads", {})
+    
+    # NEW: Separate counters for detailed feedback
     cleared_count = 0
-    skipped_count = 0
+    skipped_in_progress_count = 0
+    skipped_awaiting_download_count = 0
 
     # Load grace periods from environment variables with sane defaults
     try:
@@ -103,16 +106,19 @@ async def clear_cache(clear_images: bool = True, clear_videos: bool = True):
     except ValueError:
         raise HTTPException(status_code=500, detail="Invalid timer value in .env file.")
 
-    def is_unprotected(abs_path: str, rel_path: str) -> bool:
-        """Determines if a file is eligible for deletion based on tracking info."""
+    def get_protection_status(abs_path: str, rel_path: str) -> str:
+        """
+        Determines if a file is unprotected or identifies the reason for protection.
+        Returns: "UNPROTECTED", "PROTECTED_IN_PROGRESS", "PROTECTED_AWAITING_DOWNLOAD"
+        """
         # First, check if it's an in-progress upload using its absolute path.
         if abs_path in in_progress_uploads:
-            return False # PROTECTED
+            return "PROTECTED_IN_PROGRESS" # PROTECTED
 
         file_info = tracker_by_path.get(rel_path)
         if not file_info:
             # If it's not an active upload and not a tracked result, it's unprotected.
-            return True
+            return "UNPROTECTED"
         
         current_time = time.time()
         
@@ -121,18 +127,18 @@ async def clear_cache(clear_images: bool = True, clear_videos: bool = True):
             file_type = file_info.get("file_type", "image") # Default to image for safety
             grace_period = video_grace_period if file_type == "video" else image_grace_period
             if (current_time - file_info["downloaded_at"]) > grace_period:
-                return True
+                return "UNPROTECTED"
 
         # Condition B: Active but abandoned (heartbeat timed out)
-        elif file_info["status"] == "active":
+        if file_info["status"] == "active":
             if (current_time - file_info["last_heartbeat_at"]) > heartbeat_timeout:
-                return True
+                return "UNPROTECTED"
         
-        # If none of the above, the file is protected
-        return False
+        # If none of the above, the file is protected awaiting download
+        return "PROTECTED_AWAITING_DOWNLOAD"
 
     def safe_clear_dir(path_to_clear):
-        nonlocal cleared_count, skipped_count
+        nonlocal cleared_count, skipped_in_progress_count, skipped_awaiting_download_count
         if not os.path.exists(path_to_clear): return
 
         # Walk the directory from the bottom up to allow subdirectory removal
@@ -142,11 +148,12 @@ async def clear_cache(clear_images: bool = True, clear_videos: bool = True):
                 file_path_abs = os.path.join(dirpath, f)
                 file_path_rel = f"/static_results/{os.path.relpath(file_path_abs, 'temp').replace(os.path.sep, '/')}"
                 
-                if is_unprotected(file_path_abs, file_path_rel):
+                protection_status = get_protection_status(file_path_abs, file_path_rel)
+                
+                if protection_status == "UNPROTECTED":
                     try:
                         os.unlink(file_path_abs)
                         cleared_count += 1
-                        # Clean up tracker if we delete the file
                         if file_path_rel in tracker_by_path:
                             task_id_to_del = tracker_by_path[file_path_rel].get("task_id")
                             del tracker_by_path[file_path_rel]
@@ -154,8 +161,10 @@ async def clear_cache(clear_images: bool = True, clear_videos: bool = True):
                                 del path_by_task_id[task_id_to_del]
                     except Exception as e:
                         print(f"Failed to delete file {file_path_abs}. Reason: {e}")
-                else:
-                    skipped_count += 1
+                elif protection_status == "PROTECTED_IN_PROGRESS":
+                    skipped_in_progress_count += 1
+                elif protection_status == "PROTECTED_AWAITING_DOWNLOAD":
+                    skipped_awaiting_download_count += 1
             
             # Then, try to remove now-empty subdirectories
             for d in dirnames:
@@ -172,7 +181,8 @@ async def clear_cache(clear_images: bool = True, clear_videos: bool = True):
         
         return JSONResponse(status_code=200, content={
             "cleared_count": cleared_count,
-            "skipped_count": skipped_count
+            "skipped_in_progress_count": skipped_in_progress_count,
+            "skipped_awaiting_download_count": skipped_awaiting_download_count
         })
     except Exception as e:
         print(f"Error clearing cache: {e}")

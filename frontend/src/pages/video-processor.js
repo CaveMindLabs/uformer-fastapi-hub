@@ -301,7 +301,16 @@ const VideoProcessorPage = () => {
                     <div className="video-box">
                         <div className="video-header">
                             <h3 style={{ color: '#f0e68c' }}>Enhanced Video</h3>
-                            <button id="downloadBtn" onClick={handleDownload} disabled={isDownloaded || !processedVideoSrc} className={`enhanced-style ${!processedVideoSrc ? 'hidden' : ''}`} style={isDownloaded ? { backgroundColor: '#2e8b57', color: 'white', cursor: 'default', borderColor: '#2e8b57' } : {}}>
+                            <button 
+                                id="downloadBtn" 
+                                onClick={handleDownload} 
+                                disabled={isDownloaded || !processedVideoSrc} 
+                                className={!processedVideoSrc ? 'hidden' : ''} 
+                                style={isDownloaded 
+                                    ? { backgroundColor: '#2e8b57', color: 'white', cursor: 'default', borderColor: '#2e8b57' } 
+                                    : { backgroundColor: '#f0e68c', color: '#333', borderColor: '#d8c973', fontWeight: 500 }
+                                }
+                            >
                                 {isDownloaded ? 'Downloaded' : 'Download'}
                             </button>
                         </div>
