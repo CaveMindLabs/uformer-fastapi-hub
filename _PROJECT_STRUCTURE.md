@@ -1,7 +1,7 @@
 ## Project Structure: 
 
 ```text
-
+uformer-fastapi-hub/
 ├── backend/
 │   ├── app/
 │   │   ├── api/
@@ -23,15 +23,27 @@
 │   │       ├── Uformer_B_GoPro.pth
 │   │       └── Uformer_B_SIDD.pth
 │   ├── temp/
-│   │   ├── images/
-│   │   │   └── denoise/
-│   │   │       ├── developed_inputs/ (elements ignored)
-│   │   │       ├── processed/ (elements ignored)
-│   │   │       └── uploads/ (elements ignored)
-│   │   └── videos/
-│   │       └── denoise/
-│   │           ├── processed/ (elements ignored)
-│   │           └── uploads/ (elements ignored)
+│   │   ├── images/ (empty)
+│   │   └── videos/ (empty)
+│   ├── tester/
+│   │   ├── css/
+│   │   │   └── style.css
+│   │   ├── js/
+│   │   │   ├── components/
+│   │   │   │   ├── CacheManager.js
+│   │   │   │   ├── Header.js
+│   │   │   │   ├── Layout.js
+│   │   │   │   ├── Modal.js
+│   │   │   │   ├── NavBar.js
+│   │   │   │   ├── TitleBlock.js
+│   │   │   │   └── VRAMManager.js
+│   │   │   ├── pages/
+│   │   │   │   ├── ImageProcessorPage.js
+│   │   │   │   ├── LiveStreamPage.js
+│   │   │   │   └── VideoProcessorPage.js
+│   │   │   ├── app.js
+│   │   │   └── config.js
+│   │   └── index.html
 │   ├── uformer_model/
 │   │   ├── utils/
 │   │   │   ├── __init__.py
@@ -40,10 +52,11 @@
 │   │   └── model.py
 │   ├── .env
 │   ├── .env.example
-│   ├── image_processor.html
-│   ├── requirements.txt
-│   ├── video_processor.html
-│   └── wstest_uformer.html
+│   ├── _to_note.md
+│   └── requirements.txt
+├── documentation/
+│   ├── API_USAGE_GUIDE.md
+│   └── IMPLEMENTATION_GUIDE.md
 ├── frontend/
 │   ├── public/
 │   │   ├── favicon.ico
@@ -55,15 +68,17 @@
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── Header.js
-│   │   │   └── Layout.js
+│   │   │   ├── Layout.js
+│   │   │   └── Modal.js
 │   │   ├── pages/
 │   │   │   ├── _app.js
 │   │   │   ├── _document.js
 │   │   │   ├── image-processor.js
 │   │   │   ├── index.js
 │   │   │   └── video-processor.js
-│   │   └── styles/
-│   │       └── globals.css
+│   │   ├── styles/
+│   │   │   └── globals.css
+│   │   └── config.js
 │   ├── .gitignore
 │   ├── eslint.config.mjs
 │   ├── jsconfig.json
@@ -75,6 +90,7 @@
 ├── _code_state.md
 ├── _code_state.py
 ├── _useful_commands.md
+├── new_prompt.md
 └── README.md
 ```
 
